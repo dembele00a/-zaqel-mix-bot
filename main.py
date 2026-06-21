@@ -30,11 +30,26 @@ while True:
                 chat_id = u["message"]["chat"]["id"]
                 text = u["message"].get("text", "")
 
-                if text == "/start":
-                    send(
-                        chat_id,
-                        "👋 Zaqel aktif.\n\n1. Kripto → Kripto\n2. IBAN → Kripto\n3. Kripto → IBAN"
-                    )
+               if text == "/start":
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🔄 Swap Başlat", "callback_data": "swap"}],
+            [{"text": "📦 Siparişlerim", "callback_data": "orders"}],
+            [{"text": "💰 Komisyonlar", "callback_data": "fees"}],
+            [{"text": "ℹ️ Nasıl Çalışır?", "callback_data": "help"}],
+            [{"text": "📞 Destek", "callback_data": "support"}]
+        ]
+    }
+
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        json={
+            "chat_id": chat_id,
+            "text": "👋 Zaqel Swap'a hoş geldiniz.\n\nGüvenli, hızlı ve kolay kripto dönüşüm platformu.",
+            "reply_markup": keyboard
+        }
+    )
 
         time.sleep(1)
 
