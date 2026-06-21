@@ -1,4 +1,4 @@
-import os, time, random, requests, threading
+import os, time, random, requests, threading, json
 from flask import Flask, request, redirect, session
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -14,34 +14,31 @@ app.secret_key = "zaqel-panel-secret"
 user_state = {}
 orders = {}
 
+coins = {
+    "TRX": {"name": "TRON", "emoji": "🔴", "network": "TRC20", "address": "", "active": "on"},
+    "LTC": {"name": "Litecoin", "emoji": "⚪", "network": "LTC", "address": "", "active": "on"},
+    "USDT": {"name": "USDT", "emoji": "🔵", "network": "TRC20", "address": "", "active": "on"},
+}
+
 settings = {
-    "fee_crypto_to_crypto": os.getenv("FEE_CRYPTO_TO_CRYPTO", "1"),
-    "fee_iban_to_crypto": os.getenv("FEE_IBAN_TO_CRYPTO", "3"),
-    "fee_crypto_to_iban": os.getenv("FEE_CRYPTO_TO_IBAN", "2"),
-
-    "min_crypto_to_crypto": os.getenv("MIN_CRYPTO_TO_CRYPTO", "100"),
-    "min_iban_to_crypto": os.getenv("MIN_IBAN_TO_CRYPTO", "100"),
-    "min_crypto_to_iban": os.getenv("MIN_CRYPTO_TO_IBAN", "100"),
-
-    "support": "📞 Destek için admin ile iletişime geç.",
-    "working_hours": "09:00 - 23:59",
-
-    "trx_address": "",
-    "ltc_address": "",
-    "usdt_address": "",
-
+    "fee_crypto_to_crypto": "1",
+    "fee_iban_to_crypto": "3",
+    "fee_crypto_to_iban": "2",
+    "min_crypto_to_crypto": "100",
+    "min_iban_to_crypto": "100",
+    "min_crypto_to_iban": "100",
     "bank_name": "",
     "iban": "",
     "iban_owner": "",
     "iban_active": "on",
-
-    "iban_warning": "⚠️ Verilen IBAN numarasına para gönderen kişinin TC Kimlik numarasını açıklama kısmında belirtmesi zorunludur. Aksi takdirde dönüşüm işlemi gerçekleştirilmeyecektir.",
 }
 
-COINS = {
-    "TRX": "🔴 TRON (TRX)",
-    "LTC": "⚪ Litecoin (LTC)",
-    "USDT": "🔵 USDT (TRC20)",
+messages = {
+    "welcome": "👋 Zaqel Swap'a hoş geldiniz.\n\nGüvenli, hızlı ve manuel onaylı takas platformu.",
+    "support": "📞 Destek için admin ile iletişime geç.",
+    "help": "ℹ️ İşlem türünü seç, bilgileri gir, admin manuel olarak işlemi tamamlar.",
+    "iban_warning": "⚠️ Verilen IBAN numarasına para gönderen kişinin TC Kimlik numarasını açıklama kısmında belirtmesi zorunludur. Aksi takdirde dönüşüm işlemi gerçekleştirilmeyecektir.",
+    "working_hours": "09:00 - 23:59",
 }
 
 def api(method, data):
@@ -56,8 +53,15 @@ def send(chat_id, text, keyboard=None):
 def answer(cb_id):
     api("answerCallbackQuery", {"callback_query_id": cb_id})
 
+def active_coins():
+    return {k:v for k,v in coins.items() if v.get("active") == "on"}
+
+def coin_label(symbol):
+    c = coins[symbol]
+    return f"{c['emoji']} {c['name']} ({symbol})"
+
 def menu(chat_id):
-    send(chat_id, "👋 Zaqel Swap'a hoş geldiniz.\n\nGüvenli, hızlı ve manuel onaylı takas platformu.", {
+    send(chat_id, messages["welcome"], {
         "inline_keyboard": [
             [{"text": "🔄 Swap Başlat", "callback_data": "swap"}],
             [{"text": "📦 Siparişlerim", "callback_data": "orders"}],
@@ -79,9 +83,9 @@ def swap_menu(chat_id):
 
 def coin_menu(chat_id, prefix, exclude=None):
     rows = []
-    for c, label in COINS.items():
-        if c != exclude:
-            rows.append([{"text": label, "callback_data": f"{prefix}_{c}"}])
+    for symbol in active_coins():
+        if symbol != exclude:
+            rows.append([{"text": coin_label(symbol), "callback_data": f"{prefix}_{symbol}"}])
     rows.append([{"text": "⬅️ Geri", "callback_data": "swap"}])
     send(chat_id, "Coin seçiniz:", {"inline_keyboard": rows})
 
@@ -89,12 +93,7 @@ def create_order(chat_id, username):
     s = user_state[chat_id]
     oid = random.randint(10000, 99999)
 
-    orders[oid] = {
-        "chat_id": chat_id,
-        "username": username,
-        **s,
-        "status": "⏳ Bekliyor"
-    }
+    orders[oid] = {"chat_id": chat_id, "username": username, **s, "status": "⏳ Bekliyor"}
 
     type_name = {
         "crypto_to_crypto": "🔄 Kripto → Kripto",
@@ -102,17 +101,8 @@ def create_order(chat_id, username):
         "crypto_to_iban": "💳 Kripto → IBAN",
     }[s["type"]]
 
-    fee = {
-        "crypto_to_crypto": settings["fee_crypto_to_crypto"],
-        "iban_to_crypto": settings["fee_iban_to_crypto"],
-        "crypto_to_iban": settings["fee_crypto_to_iban"],
-    }[s["type"]]
-
-    min_amount = {
-        "crypto_to_crypto": settings["min_crypto_to_crypto"],
-        "iban_to_crypto": settings["min_iban_to_crypto"],
-        "crypto_to_iban": settings["min_crypto_to_iban"],
-    }[s["type"]]
+    fee = settings["fee_" + s["type"]]
+    min_amount = settings["min_" + s["type"]]
 
     text = f"📄 Sipariş Özeti\n\nNo: #{oid}\nTür: {type_name}\nKomisyon: %{fee}\nMinimum İşlem: {min_amount} TL\n"
 
@@ -121,14 +111,12 @@ def create_order(chat_id, username):
 
     elif s["type"] == "iban_to_crypto":
         text += f"\nÖdenecek TL: {s['amount']} TL\nAlınacak: {s['to_coin']}\nAlıcı adres:\n{s['wallet']}\n\n"
-        text += f"🏦 Ödeme IBAN:\nBanka: {settings['bank_name']}\nIBAN: {settings['iban']}\nAlıcı: {settings['iban_owner']}\n"
-        text += f"\n{settings['iban_warning']}\n"
+        text += f"🏦 Ödeme IBAN:\nBanka: {settings['bank_name']}\nIBAN: {settings['iban']}\nAlıcı: {settings['iban_owner']}\n\n{messages['iban_warning']}\n"
 
     elif s["type"] == "crypto_to_iban":
         text += f"\nGönderilen: {s['amount']} {s['from_coin']}\nIBAN:\n{s['iban']}\nAd Soyad: {s['name']}\n"
 
     text += "\nDurum: ⏳ Admin onayı bekleniyor"
-
     send(chat_id, text)
 
     if ADMIN_CHAT_ID:
@@ -217,16 +205,16 @@ def bot_loop():
                     elif data == "fees":
                         send(chat_id, f"💰 Komisyonlar:\n\n🔄 Kripto → Kripto: %{settings['fee_crypto_to_crypto']}\n🏦 IBAN → Kripto: %{settings['fee_iban_to_crypto']}\n💳 Kripto → IBAN: %{settings['fee_crypto_to_iban']}")
                     elif data == "help":
-                        send(chat_id, f"ℹ️ Nasıl çalışır?\n\n1. İşlem türünü seç.\n2. Bilgileri gir.\n3. Sipariş oluşturulur.\n4. Admin manuel olarak işlemi tamamlar.\n\nÇalışma saatleri: {settings['working_hours']}")
+                        send(chat_id, messages["help"] + f"\n\nÇalışma saatleri: {messages['working_hours']}")
                     elif data == "support":
-                        send(chat_id, settings["support"])
+                        send(chat_id, messages["support"])
 
                     elif data == "type_crypto_to_crypto":
                         user_state[chat_id] = {"type": "crypto_to_crypto"}
                         coin_menu(chat_id, "from")
                     elif data == "type_iban_to_crypto":
                         if settings["iban_active"] != "on":
-                            send(chat_id, "❌ Şu anda IBAN ile ödeme geçici olarak kapalıdır.")
+                            send(chat_id, "❌ Şu anda IBAN ile ödeme kapalıdır.")
                         else:
                             user_state[chat_id] = {"type": "iban_to_crypto"}
                             coin_menu(chat_id, "to")
@@ -296,9 +284,49 @@ def admin():
         return redirect("/login")
 
     if request.method == "POST":
-        for k in settings.keys():
-            settings[k] = request.form.get(k, "")
+        action = request.form.get("action")
+
+        if action == "settings":
+            for k in settings.keys():
+                settings[k] = request.form.get(k, "")
+
+            for k in messages.keys():
+                messages[k] = request.form.get(k, "")
+
+        elif action == "add_coin":
+            symbol = request.form.get("symbol", "").upper().strip()
+            if symbol:
+                coins[symbol] = {
+                    "name": request.form.get("name", ""),
+                    "emoji": request.form.get("emoji", "🪙"),
+                    "network": request.form.get("network", ""),
+                    "address": request.form.get("address", ""),
+                    "active": request.form.get("active", "on"),
+                }
+
+        elif action == "update_coins":
+            for symbol in list(coins.keys()):
+                coins[symbol]["name"] = request.form.get(f"name_{symbol}", coins[symbol]["name"])
+                coins[symbol]["emoji"] = request.form.get(f"emoji_{symbol}", coins[symbol]["emoji"])
+                coins[symbol]["network"] = request.form.get(f"network_{symbol}", coins[symbol]["network"])
+                coins[symbol]["address"] = request.form.get(f"address_{symbol}", coins[symbol]["address"])
+                coins[symbol]["active"] = request.form.get(f"active_{symbol}", "off")
+
         return redirect("/admin")
+
+    coin_rows = ""
+    for symbol, c in coins.items():
+        checked = "checked" if c.get("active") == "on" else ""
+        coin_rows += f"""
+        <tr>
+        <td>{symbol}</td>
+        <td><input name="emoji_{symbol}" value="{c['emoji']}" style="width:60px"></td>
+        <td><input name="name_{symbol}" value="{c['name']}"></td>
+        <td><input name="network_{symbol}" value="{c['network']}"></td>
+        <td><input name="address_{symbol}" value="{c['address']}"></td>
+        <td><input type="checkbox" name="active_{symbol}" value="on" {checked}></td>
+        </tr>
+        """
 
     order_rows = ""
     for oid, o in orders.items():
@@ -311,7 +339,7 @@ def admin():
     <style>
     body {{ font-family: Arial; background:#0f0f0f; color:white; padding:25px; }}
     input, textarea {{ background:#1e1e1e; color:white; border:1px solid #444; padding:8px; width:420px; }}
-    textarea {{ height:80px; }}
+    textarea {{ height:80px; width:700px; }}
     button {{ padding:10px 20px; background:#ff3333; color:white; border:0; cursor:pointer; }}
     .box {{ background:#181818; padding:20px; margin-bottom:20px; border-radius:10px; }}
     a {{ color:#ff5555; }}
@@ -324,6 +352,16 @@ def admin():
     <a href="/logout">Çıkış</a>
 
     <form method="post">
+    <input type="hidden" name="action" value="settings">
+
+    <div class="box">
+    <h2>📝 Bot Mesajları</h2>
+    Hoş geldin mesajı<br><textarea name="welcome">{messages['welcome']}</textarea><br><br>
+    Nasıl çalışır mesajı<br><textarea name="help">{messages['help']}</textarea><br><br>
+    Destek mesajı<br><textarea name="support">{messages['support']}</textarea><br><br>
+    IBAN uyarı mesajı<br><textarea name="iban_warning">{messages['iban_warning']}</textarea><br><br>
+    Çalışma saatleri<br><input name="working_hours" value="{messages['working_hours']}"><br><br>
+    </div>
 
     <div class="box">
     <h2>💰 Komisyon Yönetimi</h2>
@@ -345,24 +383,36 @@ def admin():
     IBAN<br><input name="iban" value="{settings['iban']}"><br><br>
     Alıcı adı soyadı<br><input name="iban_owner" value="{settings['iban_owner']}"><br><br>
     IBAN aktif için 'on', kapalı için 'off'<br><input name="iban_active" value="{settings['iban_active']}"><br><br>
-    IBAN uyarı mesajı<br><textarea name="iban_warning">{settings['iban_warning']}</textarea><br><br>
     </div>
 
-    <div class="box">
-    <h2>🪙 Kripto Adresleri</h2>
-    TRX Adresi<br><input name="trx_address" value="{settings['trx_address']}"><br><br>
-    LTC Adresi<br><input name="ltc_address" value="{settings['ltc_address']}"><br><br>
-    USDT TRC20 Adresi<br><input name="usdt_address" value="{settings['usdt_address']}"><br><br>
-    </div>
-
-    <div class="box">
-    <h2>⚙️ Genel Ayarlar</h2>
-    Destek mesajı<br><textarea name="support">{settings['support']}</textarea><br><br>
-    Çalışma saatleri<br><input name="working_hours" value="{settings['working_hours']}"><br><br>
-    </div>
-
-    <button>Kaydet</button>
+    <button>Genel Ayarları Kaydet</button>
     </form>
+
+    <div class="box">
+    <h2>🪙 Coin Yönetimi</h2>
+    <form method="post">
+    <input type="hidden" name="action" value="update_coins">
+    <table>
+    <tr><th>Sembol</th><th>Emoji/Renk</th><th>Ad</th><th>Ağ</th><th>Ödeme Adresi</th><th>Aktif</th></tr>
+    {coin_rows}
+    </table>
+    <br><button>Coinleri Kaydet</button>
+    </form>
+    </div>
+
+    <div class="box">
+    <h2>➕ Yeni Coin Ekle</h2>
+    <form method="post">
+    <input type="hidden" name="action" value="add_coin">
+    Sembol<br><input name="symbol" placeholder="BTC"><br><br>
+    Ad<br><input name="name" placeholder="Bitcoin"><br><br>
+    Emoji/Renk<br><input name="emoji" placeholder="🟠"><br><br>
+    Ağ<br><input name="network" placeholder="BTC / BEP20 / ERC20"><br><br>
+    Ödeme Adresi<br><input name="address"><br><br>
+    Aktif için on yaz<br><input name="active" value="on"><br><br>
+    <button>Coin Ekle</button>
+    </form>
+    </div>
 
     <div class="box">
     <h2>📦 Siparişler</h2>
