@@ -253,27 +253,52 @@ def bot_loop():
                         coin = data.replace("from_", "")
                         s = user_state[chat_id]
                         s["from_coin"] = coin
+
                         if s["type"] == "crypto_to_crypto":
-                            coin_menu(chat_id, "to", exclude=coin)
+                            coin_menu(
+                                chat_id,
+                                "to",
+                                exclude=coin,
+                                message_text=messages.get(
+                                    "coin_select_crypto_to_crypto",
+                                    "🔄 Alacağınız kripto para birimini seçiniz."
+                                )
+                            )
                         else:
                             s["step"] = "amount"
-                           if s["type"] == "crypto_to_crypto":
-    send(chat_id, messages.get("amount_question_crypto_to_crypto", "💰 Miktarı giriniz:"))
 
-elif s["type"] == "crypto_to_iban":
-    send(chat_id, messages.get("amount_question_crypto_to_iban", "💰 Kripto miktarını giriniz:"))
+                            if s["type"] == "crypto_to_iban":
+                                send(
+                                    chat_id,
+                                    messages.get(
+                                        "amount_question_crypto_to_iban",
+                                        "💰 Kripto miktarını giriniz:"
+                                    )
+                                )
 
                     elif data.startswith("to_"):
                         coin = data.replace("to_", "")
                         s = user_state[chat_id]
                         s["to_coin"] = coin
                         s["step"] = "amount"
-                       if s["type"] == "iban_to_crypto":
-    send(chat_id, messages.get("amount_question_iban_to_crypto", "💰 TL tutarını giriniz:"))
 
-elif s["type"] == "crypto_to_crypto":
-    send(chat_id, messages.get("amount_question_crypto_to_crypto", "💰 Miktarı giriniz:"))
+                        if s["type"] == "iban_to_crypto":
+                            send(
+                                chat_id,
+                                messages.get(
+                                    "amount_question_iban_to_crypto",
+                                    "💰 TL tutarını giriniz:"
+                                )
+                            )
 
+                        elif s["type"] == "crypto_to_crypto":
+                            send(
+                                chat_id,
+                                messages.get(
+                                    "amount_question_crypto_to_crypto",
+                                    "💰 Miktarı giriniz:"
+                                )
+                            )
             time.sleep(1)
 
         except Exception as e:
