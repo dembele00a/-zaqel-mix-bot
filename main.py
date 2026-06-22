@@ -143,16 +143,10 @@ def bot_loop():
                 OFFSET = u["update_id"] + 1
 if "message" in u:
     msg = u["message"]
-
-    try:
-        print(json.dumps(msg, ensure_ascii=False), flush=True)
-    except Exception as e:
-        print(msg, flush=True)
-        
     chat_id = msg["chat"]["id"]
     text = msg.get("text", "")
     username = msg.get("from", {}).get("username", "unknown")
-
+    
     if text == "/start":
         menu(chat_id)
 
