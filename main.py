@@ -85,6 +85,39 @@ for key, default_value in MESSAGE_DEFAULTS.items():
 save_json("messages.json", messages)
 
 
+ICON_DEFAULTS = {
+    "icon_start_swap": "",
+    "icon_my_orders": "",
+    "icon_fees": "",
+    "icon_help": "",
+    "icon_support": "",
+    "icon_iban_to_crypto": "",
+    "icon_crypto_to_iban": "",
+    "icon_crypto_to_crypto": "",
+    "icon_main_menu": "",
+    "icon_back": "",
+}
+
+for key, default_value in ICON_DEFAULTS.items():
+    messages.setdefault(key, default_value)
+
+save_json("messages.json", messages)
+
+
+def telegram_button(text, callback_data, icon_key=None):
+    button = {
+        "text": text,
+        "callback_data": callback_data,
+    }
+
+    if icon_key:
+        custom_emoji_id = str(messages.get(icon_key, "")).strip()
+        if custom_emoji_id:
+            button["icon_custom_emoji_id"] = custom_emoji_id
+
+    return button
+
+
 def api(method, data):
     try:
         return requests.post(
@@ -114,9 +147,22 @@ def active_coins():
 
 def coin_label(symbol):
     c = coins.get(symbol, {})
-    emoji = c.get("emoji", "🪙")
     name = c.get("name", symbol)
-    return f"{emoji} {name} ({symbol})"
+    return f"{name} ({symbol})"
+
+
+def coin_button(symbol, prefix):
+    coin = coins.get(symbol, {})
+    button = {
+        "text": coin_label(symbol),
+        "callback_data": f"{prefix}_{symbol}",
+    }
+
+    custom_emoji_id = str(coin.get("custom_emoji_id", "")).strip()
+    if custom_emoji_id:
+        button["icon_custom_emoji_id"] = custom_emoji_id
+
+    return button
 
 
 def menu(chat_id):
@@ -125,11 +171,11 @@ def menu(chat_id):
         messages.get("welcome", MESSAGE_DEFAULTS["welcome"]),
         {
             "inline_keyboard": [
-                [{"text": messages.get("button_start_swap", MESSAGE_DEFAULTS["button_start_swap"]), "callback_data": "swap"}],
-                [{"text": messages.get("button_my_orders", MESSAGE_DEFAULTS["button_my_orders"]), "callback_data": "orders"}],
-                [{"text": messages.get("button_fees", MESSAGE_DEFAULTS["button_fees"]), "callback_data": "fees"}],
-                [{"text": messages.get("button_help", MESSAGE_DEFAULTS["button_help"]), "callback_data": "help"}],
-                [{"text": messages.get("button_support", MESSAGE_DEFAULTS["button_support"]), "callback_data": "support"}],
+                [telegram_button(messages.get("button_start_swap", MESSAGE_DEFAULTS["button_start_swap"]), "swap", "icon_start_swap")],
+                [telegram_button(messages.get("button_my_orders", MESSAGE_DEFAULTS["button_my_orders"]), "orders", "icon_my_orders")],
+                [telegram_button(messages.get("button_fees", MESSAGE_DEFAULTS["button_fees"]), "fees", "icon_fees")],
+                [telegram_button(messages.get("button_help", MESSAGE_DEFAULTS["button_help"]), "help", "icon_help")],
+                [telegram_button(messages.get("button_support", MESSAGE_DEFAULTS["button_support"]), "support", "icon_support")],
             ]
         },
     )
@@ -141,10 +187,10 @@ def swap_menu(chat_id):
         messages.get("swap_menu", MESSAGE_DEFAULTS["swap_menu"]),
         {
             "inline_keyboard": [
-                [{"text": messages.get("button_iban_to_crypto", MESSAGE_DEFAULTS["button_iban_to_crypto"]), "callback_data": "type_iban_to_crypto"}],
-                [{"text": messages.get("button_crypto_to_iban", MESSAGE_DEFAULTS["button_crypto_to_iban"]), "callback_data": "type_crypto_to_iban"}],
-                [{"text": messages.get("button_crypto_to_crypto", MESSAGE_DEFAULTS["button_crypto_to_crypto"]), "callback_data": "type_crypto_to_crypto"}],
-                [{"text": messages.get("button_main_menu", MESSAGE_DEFAULTS["button_main_menu"]), "callback_data": "main"}],
+                [telegram_button(messages.get("button_iban_to_crypto", MESSAGE_DEFAULTS["button_iban_to_crypto"]), "type_iban_to_crypto", "icon_iban_to_crypto")],
+                [telegram_button(messages.get("button_crypto_to_iban", MESSAGE_DEFAULTS["button_crypto_to_iban"]), "type_crypto_to_iban", "icon_crypto_to_iban")],
+                [telegram_button(messages.get("button_crypto_to_crypto", MESSAGE_DEFAULTS["button_crypto_to_crypto"]), "type_crypto_to_crypto", "icon_crypto_to_crypto")],
+                [telegram_button(messages.get("button_main_menu", MESSAGE_DEFAULTS["button_main_menu"]), "main", "icon_main_menu")],
             ]
         },
     )
@@ -155,17 +201,15 @@ def coin_menu(chat_id, prefix, exclude=None, message_text="Coin seçiniz:"):
 
     for symbol in active_coins():
         if symbol != exclude:
-            rows.append(
-                [{
-                    "text": coin_label(symbol),
-                    "callback_data": f"{prefix}_{symbol}",
-                }]
-            )
+            rows.append([coin_button(symbol, prefix)])
 
-    rows.append([{
-        "text": messages.get("button_back", MESSAGE_DEFAULTS["button_back"]),
-        "callback_data": "swap",
-    }])
+    rows.append([
+        telegram_button(
+            messages.get("button_back", MESSAGE_DEFAULTS["button_back"]),
+            "swap",
+            "icon_back",
+        )
+    ])
 
     send(chat_id, message_text, {"inline_keyboard": rows})
 
@@ -326,6 +370,20 @@ def bot_loop():
                     chat_id = msg["chat"]["id"]
                     text = msg.get("text", "")
                     username = msg.get("from", {}).get("username", "unknown")
+
+                    custom_emoji_ids = [
+                        str(entity.get("custom_emoji_id"))
+                        for entity in msg.get("entities", [])
+                        if entity.get("type") == "custom_emoji"
+                        and entity.get("custom_emoji_id")
+                    ]
+
+                    if custom_emoji_ids and str(chat_id) == str(ADMIN_CHAT_ID):
+                        send(
+                            chat_id,
+                            "🧩 Custom Emoji ID:\n\n" + "\n".join(custom_emoji_ids)
+                        )
+                        continue
 
                     if text == "/start":
                         menu(chat_id)
@@ -811,6 +869,12 @@ def admin():
                     messages.get(key, MESSAGE_DEFAULTS[key]),
                 )
 
+            for key in ICON_DEFAULTS.keys():
+                messages[key] = request.form.get(
+                    key,
+                    messages.get(key, ICON_DEFAULTS[key]),
+                ).strip()
+
         elif action == "add_coin":
             symbol = request.form.get("symbol", "").upper().strip()
 
@@ -821,6 +885,7 @@ def admin():
                     "network": request.form.get("network", ""),
                     "address": request.form.get("address", ""),
                     "logo": request.form.get("logo", ""),
+                    "custom_emoji_id": request.form.get("custom_emoji_id", "").strip(),
                     "active": request.form.get("active", "on"),
                 }
 
@@ -846,6 +911,10 @@ def admin():
                     f"logo_{symbol}",
                     coins[symbol].get("logo", ""),
                 )
+                coins[symbol]["custom_emoji_id"] = request.form.get(
+                    f"custom_emoji_id_{symbol}",
+                    coins[symbol].get("custom_emoji_id", ""),
+                ).strip()
                 coins[symbol]["active"] = request.form.get(
                     f"active_{symbol}",
                     "off",
@@ -910,6 +979,7 @@ def admin():
             <td><input name="network_{h(symbol)}" value="{h(coin.get('network', ''))}"></td>
             <td><input name="address_{h(symbol)}" value="{h(coin.get('address', ''))}"></td>
             <td><input name="logo_{h(symbol)}" value="{h(coin.get('logo', ''))}"></td>
+            <td><input name="custom_emoji_id_{h(symbol)}" value="{h(coin.get('custom_emoji_id', ''))}" placeholder="Custom Emoji ID"></td>
             <td><input type="checkbox" name="active_{h(symbol)}" value="on" {checked}></td>
         </tr>
         """
@@ -954,6 +1024,19 @@ def admin():
         ("button_back", "Geri butonu"),
     ]
 
+    icon_fields = [
+        ("icon_start_swap", "Swap Başlat custom emoji ID"),
+        ("icon_my_orders", "Siparişlerim custom emoji ID"),
+        ("icon_fees", "Komisyonlar custom emoji ID"),
+        ("icon_help", "Nasıl Çalışır custom emoji ID"),
+        ("icon_support", "Destek custom emoji ID"),
+        ("icon_iban_to_crypto", "IBAN → Kripto custom emoji ID"),
+        ("icon_crypto_to_iban", "Kripto → IBAN custom emoji ID"),
+        ("icon_crypto_to_crypto", "Kripto → Kripto custom emoji ID"),
+        ("icon_main_menu", "Ana Menü custom emoji ID"),
+        ("icon_back", "Geri custom emoji ID"),
+    ]
+
     message_inputs = ""
 
     for key, label in message_fields:
@@ -976,6 +1059,15 @@ def admin():
         button_inputs += (
             f"<label>{h(label)}</label>"
             f"<input name='{h(key)}' value='{h(messages.get(key, MESSAGE_DEFAULTS.get(key, '')))}'>"
+        )
+
+    icon_inputs = ""
+
+    for key, label in icon_fields:
+        icon_inputs += (
+            f"<label>{h(label)}</label>"
+            f"<input name='{h(key)}' value='{h(messages.get(key, ''))}' "
+            f"placeholder='Custom Emoji ID'>"
         )
 
     return f"""
@@ -1438,11 +1530,24 @@ def admin():
                     <section class="box">
                         <h2>🔘 Buton Yazıları</h2>
                         <div class="section-note">
-                            Telegram menülerindeki buton adlarını ve emojilerini buradan değiştirebilirsiniz.
+                            Telegram menülerindeki buton metinlerini buradan değiştirebilirsiniz.
+                            Custom emoji kullanırken buton metnindeki normal emojiyi silebilirsiniz.
                         </div>
                         {button_inputs}
                     </section>
                 </div>
+
+                <section class="box">
+                    <h2>🧩 Tüm Menü Custom Emojileri</h2>
+                    <div class="section-note">
+                        ZIP içindeki görseller doğrudan bu alanlara yüklenmez. Önce görselleri Telegram'da
+                        custom emoji paketi olarak ekleyin. Sonra her emojiyi Zaqel botuna tek başına gönderin;
+                        bot size ID değerini cevap olarak verir. İlgili ID'yi aşağıdaki alana yapıştırın.
+                    </div>
+                    <div class="settings-grid">
+                        {icon_inputs}
+                    </div>
+                </section>
 
                 <div class="settings-grid">
                     <section class="box">
@@ -1495,6 +1600,11 @@ def admin():
 
             <section class="box">
                 <h2>🪙 Coin Yönetimi</h2>
+                <div class="section-note">
+                    Coin custom emojisini Zaqel botuna tek başına gönderin.
+                    Bot size Custom Emoji ID değerini cevap olarak verir.
+                    Bu değeri ilgili coin alanına yapıştırıp Coinleri Kaydet'e basın.
+                </div>
 
                 <form method="post">
                     <input type="hidden" name="action" value="update_coins">
@@ -1509,6 +1619,7 @@ def admin():
                                 <th>Ağ</th>
                                 <th>Ödeme Adresi</th>
                                 <th>Logo URL</th>
+                                <th>Custom Emoji ID</th>
                                 <th>Aktif</th>
                             </tr>
                             {coin_rows}
@@ -1544,6 +1655,9 @@ def admin():
 
                     <label>Logo URL</label>
                     <input name="logo">
+
+                    <label>Custom Emoji ID</label>
+                    <input name="custom_emoji_id" placeholder="Örn: 5368324170671202286">
 
                     <label>Aktiflik: on / off</label>
                     <input name="active" value="on">
