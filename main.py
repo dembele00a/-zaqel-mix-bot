@@ -71,13 +71,22 @@ def swap_menu(chat_id):
         ]
     })
 
-def coin_menu(chat_id, prefix, exclude=None):
+
+def coin_menu(chat_id, prefix, exclude=None, message_text="Coin seçiniz:"):
     rows = []
+
     for symbol in active_coins():
         if symbol != exclude:
-            rows.append([{"text": coin_label(symbol), "callback_data": f"{prefix}_{symbol}"}])
+            rows.append([
+                {
+                    "text": coin_label(symbol),
+                    "callback_data": f"{prefix}_{symbol}"
+                }
+            ])
+
     rows.append([{"text": "⬅️ Geri", "callback_data": "swap"}])
-    send(chat_id, "Coin seçiniz:", {"inline_keyboard": rows})
+
+    send(chat_id, message_text, {"inline_keyboard": rows})
 
 def create_order(chat_id, username):
     s = user_state[chat_id]
@@ -209,16 +218,37 @@ def bot_loop():
 
                     elif data == "type_crypto_to_crypto":
                         user_state[chat_id] = {"type": "crypto_to_crypto"}
-                        coin_menu(chat_id, "from")
+                        coin_menu(
+    chat_id,
+    "from",
+    message_text=messages.get(
+        "coin_select_crypto_to_iban",
+        "Coin seçiniz"
+    )
+)
                     elif data == "type_iban_to_crypto":
                         if settings["iban_active"] != "on":
                             send(chat_id, "❌ Şu anda IBAN ile ödeme kapalıdır.")
                         else:
                             user_state[chat_id] = {"type": "iban_to_crypto"}
-                            coin_menu(chat_id, "to")
+                            coin_menu(
+    chat_id,
+    "to",
+    message_text=messages.get(
+        "coin_select_iban_to_crypto",
+        "Coin seçiniz"
+    )
+)
                     elif data == "type_crypto_to_iban":
                         user_state[chat_id] = {"type": "crypto_to_iban"}
-                        coin_menu(chat_id, "from")
+                        coin_menu(
+    chat_id,
+    "from",
+    message_text=messages.get(
+        "coin_select_crypto_to_crypto",
+        "Kripto seçiniz"
+    )
+)
 
                     elif data.startswith("from_"):
                         coin = data.replace("from_", "")
