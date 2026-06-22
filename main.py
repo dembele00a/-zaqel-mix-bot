@@ -848,7 +848,9 @@ def admin_orders_fragment():
     if view not in {"active", "completed", "rejected", "all"}:
         view = "active"
 
-    return render_order_cards(view)
+    fragment = render_order_cards(view)
+    pending_count = order_counts()["active"]
+    return f"<div data-fragment-pending-count='{pending_count}'>{fragment}</div>"
 
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -1119,8 +1121,11 @@ def admin():
             .logout-row {{
                 display: flex;
                 justify-content: flex-end;
+                align-items: center;
+                gap: 10px;
                 margin-bottom: 16px;
             }}
+
 
 .logout {{
                 color: white;
@@ -1575,6 +1580,7 @@ def admin():
                     id="order-grid"
                     class="order-grid"
                     data-view="{h(current_view)}"
+                    data-pending-count="{counts['active']}"
                 >
                     {order_cards}
                 </div>
@@ -1759,6 +1765,89 @@ def admin():
         </main>
 
         <script>
+            let soundEnabled = true;
+            let audioContext = null;
+            let audioUnlocked = false;
+            let previousPendingCount = Number(
+                document.getElementById("order-grid")?.dataset.pendingCount || 0
+            );
+
+            function ensureAudioContext() {{
+                if (!audioContext) {{
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {{
+                        audioContext = new AudioContextClass();
+                    }}
+                }}
+
+                if (audioContext && audioContext.state === "suspended") {{
+                    audioContext.resume();
+                }}
+
+                audioUnlocked = Boolean(
+                    audioContext && audioContext.state === "running"
+                );
+            }}
+
+            function unlockAudioOnce() {{
+                ensureAudioContext();
+
+                if (!audioContext || !audioUnlocked) {{
+                    return;
+                }}
+
+                // Sessiz ve çok kısa bir sesle tarayıcı ses iznini aktif hale getirir.
+                const oscillator = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+
+                gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+                oscillator.connect(gain);
+                gain.connect(audioContext.destination);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.01);
+
+                document.removeEventListener("click", unlockAudioOnce);
+                document.removeEventListener("touchstart", unlockAudioOnce);
+                document.removeEventListener("keydown", unlockAudioOnce);
+            }}
+
+            document.addEventListener("click", unlockAudioOnce, {{ passive: true }});
+            document.addEventListener("touchstart", unlockAudioOnce, {{ passive: true }});
+            document.addEventListener("keydown", unlockAudioOnce);
+
+            // Tarayıcı izin verirse sayfa açılır açılmaz sesi hazır etmeyi dener.
+            ensureAudioContext();
+
+            function playOrderTink() {{
+                if (!soundEnabled) return;
+
+                ensureAudioContext();
+                if (!audioContext || audioContext.state !== "running") return;
+
+                const now = audioContext.currentTime;
+                const master = audioContext.createGain();
+                master.connect(audioContext.destination);
+                master.gain.setValueAtTime(0.0001, now);
+                master.gain.exponentialRampToValueAtTime(0.22, now + 0.01);
+                master.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+
+                const osc1 = audioContext.createOscillator();
+                const osc2 = audioContext.createOscillator();
+
+                osc1.type = "sine";
+                osc2.type = "sine";
+                osc1.frequency.setValueAtTime(1318.51, now);
+                osc2.frequency.setValueAtTime(1760.00, now + 0.08);
+
+                osc1.connect(master);
+                osc2.connect(master);
+
+                osc1.start(now);
+                osc1.stop(now + 0.35);
+                osc2.start(now + 0.08);
+                osc2.stop(now + 0.5);
+            }}
+
             let lastOrderHtml = "";
             let refreshInProgress = false;
 
@@ -1810,10 +1899,24 @@ def admin():
                     }}
 
                     const html = await response.text();
+                    const parser = new DOMParser();
+                    const documentFragment = parser.parseFromString(html, "text/html");
+                    const wrapper = documentFragment.querySelector("[data-fragment-pending-count]");
+                    const newPendingCount = Number(
+                        wrapper?.dataset.fragmentPendingCount || previousPendingCount
+                    );
+                    const nextHtml = wrapper ? wrapper.innerHTML : html;
 
-                    if (html !== lastOrderHtml && html !== grid.innerHTML) {{
-                        grid.innerHTML = html;
-                        lastOrderHtml = html;
+                    if (newPendingCount > previousPendingCount) {{
+                        playOrderTink();
+                    }}
+
+                    previousPendingCount = newPendingCount;
+                    grid.dataset.pendingCount = String(newPendingCount);
+
+                    if (nextHtml !== lastOrderHtml && nextHtml !== grid.innerHTML) {{
+                        grid.innerHTML = nextHtml;
+                        lastOrderHtml = nextHtml;
                     }}
                 }} catch (error) {{
                     console.log("Sipariş yenileme hatası:", error);
