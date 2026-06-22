@@ -1116,35 +1116,13 @@ def admin():
                 margin: 0 auto;
                 padding: 26px 0 70px;
             }}
-
-            .topbar {{
-                position: sticky;
-                top: 12px;
-                z-index: 20;
+            .logout-row {{
                 display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 18px;
-                padding: 16px 18px;
-                margin-bottom: 22px;
-                border: 1px solid var(--border);
-                border-radius: 18px;
-                background: rgba(11, 15, 23, .82);
-                backdrop-filter: blur(18px);
-                box-shadow: var(--shadow);
+                justify-content: flex-end;
+                margin-bottom: 16px;
             }}
 
-            .brand h1 {{
-                margin: 0;
-                font-size: clamp(23px, 4vw, 34px);
-            }}
-
-            .brand p {{
-                margin: 5px 0 0;
-                color: var(--muted);
-            }}
-
-            .logout {{
+.logout {{
                 color: white;
                 text-decoration: none;
                 border: 1px solid var(--border);
@@ -1161,6 +1139,63 @@ def admin():
                 background: var(--panel);
                 backdrop-filter: blur(16px);
                 box-shadow: var(--shadow);
+            }}
+
+            details.box {{
+                padding: 0;
+                overflow: hidden;
+            }}
+
+            details.box > summary {{
+                list-style: none;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 14px;
+                padding: 20px 22px;
+                cursor: pointer;
+                user-select: none;
+                font-size: 20px;
+                font-weight: 800;
+                transition: background .2s ease;
+            }}
+
+            details.box > summary::-webkit-details-marker {{
+                display: none;
+            }}
+
+            details.box > summary:hover {{
+                background: rgba(255,255,255,.035);
+            }}
+
+            details.box > summary::after {{
+                content: "＋";
+                display: inline-grid;
+                place-items: center;
+                width: 34px;
+                height: 34px;
+                flex: 0 0 34px;
+                border-radius: 10px;
+                background: rgba(96,125,255,.16);
+                border: 1px solid rgba(96,125,255,.35);
+                font-size: 22px;
+                transition: transform .22s ease, background .22s ease;
+            }}
+
+            details.box[open] > summary::after {{
+                content: "−";
+                transform: rotate(180deg);
+                background: rgba(146,101,255,.18);
+                border-color: rgba(146,101,255,.38);
+            }}
+
+            .collapsible-content {{
+                padding: 0 22px 22px;
+                border-top: 1px solid rgba(255,255,255,.05);
+            }}
+
+            .collapsible-content .section-note {{
+                margin-top: 16px;
             }}
 
             h2 {{
@@ -1436,14 +1471,22 @@ def admin():
                     width: min(100% - 16px, 1380px);
                 }}
 
-                .topbar {{
-                    top: 7px;
-                    align-items: flex-start;
-                }}
-
                 .box {{
                     padding: 15px;
                     border-radius: 15px;
+                }}
+
+                details.box {{
+                    padding: 0;
+                }}
+
+                details.box > summary {{
+                    padding: 16px;
+                    font-size: 17px;
+                }}
+
+                .collapsible-content {{
+                    padding: 0 16px 16px;
                 }}
 
                 .order-grid {{
@@ -1470,14 +1513,9 @@ def admin():
 
     <body>
         <main class="container">
-            <header class="topbar">
-                <div class="brand">
-                    <h1>⚙️ Zaqel Control Center</h1>
-                    <p>Bot, mesaj, buton, coin ve sipariş yönetimi</p>
-                </div>
-
+            <div class="logout-row">
                 <a class="logout" href="/logout">Çıkış</a>
-            </header>
+            </div>
 
             <section class="box">
                 <h2>📦 Sipariş Kontrol Alanı</h2>
@@ -1519,26 +1557,33 @@ def admin():
                 <input type="hidden" name="return_view" value="{h(current_view)}">
 
                 <div class="two-col">
-                    <section class="box">
-                        <h2>📝 Bot Mesajları</h2>
+                    <details class="box">
+                        <summary>📝 Bot Mesajları</summary>
+                        <div class="collapsible-content">
                         <div class="section-note">
                             Kullanıcıya gönderilen temel bot metinlerinin tamamını buradan düzenleyebilirsiniz.
                         </div>
                         {message_inputs}
-                    </section>
 
-                    <section class="box">
-                        <h2>🔘 Buton Yazıları</h2>
+                        </div>
+                    </details>
+
+                    <details class="box">
+                        <summary>🔘 Buton Yazıları</summary>
+                        <div class="collapsible-content">
                         <div class="section-note">
                             Telegram menülerindeki buton metinlerini buradan değiştirebilirsiniz.
                             Custom emoji kullanırken buton metnindeki normal emojiyi silebilirsiniz.
                         </div>
                         {button_inputs}
-                    </section>
+
+                        </div>
+                    </details>
                 </div>
 
-                <section class="box">
-                    <h2>🧩 Tüm Menü Custom Emojileri</h2>
+                <details class="box">
+                    <summary>🧩 Tüm Menü Custom Emojileri</summary>
+                    <div class="collapsible-content">
                     <div class="section-note">
                         ZIP içindeki görseller doğrudan bu alanlara yüklenmez. Önce görselleri Telegram'da
                         custom emoji paketi olarak ekleyin. Sonra her emojiyi Zaqel botuna tek başına gönderin;
@@ -1547,11 +1592,14 @@ def admin():
                     <div class="settings-grid">
                         {icon_inputs}
                     </div>
-                </section>
+
+                    </div>
+                </details>
 
                 <div class="settings-grid">
-                    <section class="box">
-                        <h2>💰 Komisyon Yönetimi</h2>
+                    <details class="box">
+                        <summary>💰 Komisyon Yönetimi</summary>
+                        <div class="collapsible-content">
 
                         <label>Kripto → Kripto %</label>
                         <input name="fee_crypto_to_crypto" value="{h(settings.get('fee_crypto_to_crypto', ''))}">
@@ -1561,10 +1609,13 @@ def admin():
 
                         <label>Kripto → IBAN %</label>
                         <input name="fee_crypto_to_iban" value="{h(settings.get('fee_crypto_to_iban', ''))}">
-                    </section>
 
-                    <section class="box">
-                        <h2>📉 Minimum Ödeme</h2>
+                        </div>
+                    </details>
+
+                    <details class="box">
+                        <summary>📉 Minimum Ödeme</summary>
+                        <div class="collapsible-content">
 
                         <label>Min Kripto → Kripto TL</label>
                         <input name="min_crypto_to_crypto" value="{h(settings.get('min_crypto_to_crypto', ''))}">
@@ -1574,10 +1625,13 @@ def admin():
 
                         <label>Min Kripto → IBAN TL</label>
                         <input name="min_crypto_to_iban" value="{h(settings.get('min_crypto_to_iban', ''))}">
-                    </section>
 
-                    <section class="box">
-                        <h2>🏦 IBAN Yönetimi</h2>
+                        </div>
+                    </details>
+
+                    <details class="box">
+                        <summary>🏦 IBAN Yönetimi</summary>
+                        <div class="collapsible-content">
 
                         <label>Banka adı</label>
                         <input name="bank_name" value="{h(settings.get('bank_name', ''))}">
@@ -1590,7 +1644,9 @@ def admin():
 
                         <label>Aktiflik: on / off</label>
                         <input name="iban_active" value="{h(settings.get('iban_active', 'on'))}">
-                    </section>
+
+                        </div>
+                    </details>
                 </div>
 
                 <button class="save" type="submit">
@@ -1598,8 +1654,9 @@ def admin():
                 </button>
             </form>
 
-            <section class="box">
-                <h2>🪙 Coin Yönetimi</h2>
+            <details class="box">
+                <summary>🪙 Coin Yönetimi</summary>
+                <div class="collapsible-content">
                 <div class="section-note">
                     Coin custom emojisini Zaqel botuna tek başına gönderin.
                     Bot size Custom Emoji ID değerini cevap olarak verir.
@@ -1629,10 +1686,13 @@ def admin():
                     <br>
                     <button type="submit">Coinleri Kaydet</button>
                 </form>
-            </section>
 
-            <section class="box">
-                <h2>➕ Yeni Coin Ekle</h2>
+                </div>
+            </details>
+
+            <details class="box">
+                <summary>➕ Yeni Coin Ekle</summary>
+                <div class="collapsible-content">
 
                 <form method="post">
                     <input type="hidden" name="action" value="add_coin">
@@ -1665,7 +1725,9 @@ def admin():
                     <br><br>
                     <button type="submit">Coin Ekle</button>
                 </form>
-            </section>
+
+                </div>
+            </details>
         </main>
 
         <script>
