@@ -258,14 +258,22 @@ def bot_loop():
                             coin_menu(chat_id, "to", exclude=coin)
                         else:
                             s["step"] = "amount"
-                            send(chat_id, "💰 Göndereceğin miktarı gir:")
+                           if s["type"] == "crypto_to_crypto":
+    send(chat_id, messages.get("amount_question_crypto_to_crypto", "💰 Miktarı giriniz:"))
+
+elif s["type"] == "crypto_to_iban":
+    send(chat_id, messages.get("amount_question_crypto_to_iban", "💰 Kripto miktarını giriniz:"))
 
                     elif data.startswith("to_"):
                         coin = data.replace("to_", "")
                         s = user_state[chat_id]
                         s["to_coin"] = coin
                         s["step"] = "amount"
-                        send(chat_id, "💰 Miktarı gir:")
+                       if s["type"] == "iban_to_crypto":
+    send(chat_id, messages.get("amount_question_iban_to_crypto", "💰 TL tutarını giriniz:"))
+
+elif s["type"] == "crypto_to_crypto":
+    send(chat_id, messages.get("amount_question_crypto_to_crypto", "💰 Miktarı giriniz:"))
 
             time.sleep(1)
 
