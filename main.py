@@ -267,7 +267,7 @@ def my_orders(chat_id):
         send(chat_id, messages.get("orders_empty", MESSAGE_DEFAULTS["orders_empty"]))
 
 
-def update_order_status(oid, new_status, reject_reason=""):
+def update_order_status(oid, new_status, reject_reason="", approval_reason=""):
     oid = str(oid)
 
     with data_lock:
@@ -278,6 +278,7 @@ def update_order_status(oid, new_status, reject_reason=""):
         if new_status == "completed":
             order["status"] = "✅ Tamamlandı"
             order["completed_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            order["approval_reason"] = approval_reason.strip()
             order["archived"] = False
             user_message = messages.get("order_completed", MESSAGE_DEFAULTS["order_completed"])
 
@@ -294,6 +295,9 @@ def update_order_status(oid, new_status, reject_reason=""):
         save_json("orders.json", orders)
 
     notification = f"{user_message}\n\nSipariş No: #{oid}"
+
+    if new_status == "completed" and approval_reason.strip():
+        notification += f"\nOnay notu: {approval_reason.strip()}"
 
     if new_status == "rejected" and reject_reason.strip():
         notification += f"\nRed sebebi: {reject_reason.strip()}"
@@ -684,6 +688,9 @@ def render_order_cards(view="active"):
         if order.get("completed_at"):
             details.append(("Tamamlanma", order.get("completed_at")))
 
+        if order.get("approval_reason"):
+            details.append(("Onay Notu", order.get("approval_reason")))
+
         if order.get("rejected_at"):
             details.append(("Reddedilme", order.get("rejected_at")))
 
@@ -707,6 +714,7 @@ def render_order_cards(view="active"):
                     <input type="hidden" name="action" value="complete_order">
                     <input type="hidden" name="order_id" value="{h(oid)}">
                     <input type="hidden" name="return_view" value="{h(view)}">
+                    <textarea class="approval-reason" name="approval_reason" placeholder="Onay notu yazın (isteğe bağlı)..."></textarea>
                     <button class="complete" type="submit">✅ Tamamla</button>
                 </form>
 
@@ -847,6 +855,7 @@ def admin():
             update_order_status(
                 request.form.get("order_id", ""),
                 "completed",
+                approval_reason=request.form.get("approval_reason", ""),
             )
 
         elif action == "reject_order":
@@ -1552,7 +1561,10 @@ def admin():
                 if (
                     activeElement &&
                     activeElement.classList &&
-                    activeElement.classList.contains("reject-reason")
+                    (
+                        activeElement.classList.contains("reject-reason") ||
+                        activeElement.classList.contains("approval-reason")
+                    )
                 ) {{
                     return;
                 }}
