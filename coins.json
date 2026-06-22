@@ -1,1 +1,26 @@
-{}
+{
+  "TRX": {
+    "name": "TRON",
+    "emoji": "🔴",
+    "network": "TRC20",
+    "address": "",
+    "logo": "",
+    "active": "on"
+  },
+  "LTC": {
+    "name": "Litecoin",
+    "emoji": "⚪",
+    "network": "LTC",
+    "address": "",
+    "logo": "",
+    "active": "on"
+  },
+  "USDT": {
+    "name": "USDT",
+    "emoji": "🟢",
+    "network": "TRC20",
+    "address": "",
+    "logo": "",
+    "active": "on"
+  }
+}
