@@ -29,7 +29,6 @@ coins = load_json("coins.json", {})
 settings = load_json("settings.json", {})
 messages = load_json("messages.json", {})
 orders = load_json("orders.json", {})
-}
 
 def api(method, data):
     return requests.post(f"https://api.telegram.org/bot{TOKEN}/{method}", json=data).json()
