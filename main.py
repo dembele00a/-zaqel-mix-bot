@@ -148,7 +148,7 @@ def bot_loop():
                     text = msg.get("text", "")
                     username = msg.get("from", {}).get("username", "unknown")
     
-                     if text == "/start":
+                    if text == "/start":
                         menu(chat_id)
 
                     elif text == "/siparislerim":
