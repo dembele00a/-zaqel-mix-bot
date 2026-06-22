@@ -42,6 +42,49 @@ messages = load_json("messages.json", {})
 orders = load_json("orders.json", {})
 
 
+MESSAGE_DEFAULTS = {
+    "welcome": "👋 Zaqel Swap'a hoş geldiniz.\n\nGüvenli, hızlı ve manuel onaylı takas platformu.",
+    "swap_menu": "🔄 İşlem türünü seçiniz:",
+    "coin_select_crypto_to_crypto": "🔄 Göndereceğiniz kripto para birimini seçiniz.",
+    "coin_select_crypto_to_crypto_receive": "🔄 Almak istediğiniz kripto para birimini seçiniz.",
+    "coin_select_iban_to_crypto": "🏦 Satın almak istediğiniz kripto para birimini seçiniz.",
+    "coin_select_crypto_to_iban": "💳 TL'ye çevirmek istediğiniz kripto para birimini seçiniz.",
+    "amount_question_crypto_to_crypto": "💰 Göndereceğiniz kripto miktarını giriniz:",
+    "amount_question_iban_to_crypto": "💰 Göndereceğiniz TL miktarını giriniz:",
+    "amount_question_crypto_to_iban": "💰 Bozduracağınız kripto miktarını giriniz:",
+    "wallet_question": "📥 Alıcı cüzdan adresini giriniz:",
+    "iban_question": "🏦 IBAN adresinizi giriniz:",
+    "name_question": "👤 IBAN sahibinin ad soyad bilgisini giriniz:",
+    "support": "📞 Destek için admin ile iletişime geçiniz.",
+    "help": "ℹ️ İşlem türünü seçin ve bilgileri doldurun.",
+    "iban_warning": "⚠️ Verilen IBAN numarasına para gönderen kişinin TC Kimlik numarasını açıklama kısmında belirtmesi zorunludur. Aksi takdirde dönüşüm işlemi gerçekleştirilmeyecektir.",
+    "order_created": "✅ Siparişiniz oluşturuldu.",
+    "order_completed": "✅ Siparişiniz tamamlandı.",
+    "order_rejected": "❌ Siparişiniz reddedildi.",
+    "orders_title": "📦 Siparişleriniz:",
+    "orders_empty": "📦 Henüz siparişiniz yok.",
+    "fees_title": "💰 Komisyonlar:",
+    "iban_closed": "❌ Şu anda IBAN ile ödeme kapalıdır.",
+    "session_expired": "❌ İşlem süresi doldu. Lütfen tekrar başlayın.",
+    "working_hours": "09:00 - 23:59",
+    "button_start_swap": "🔄 Swap Başlat",
+    "button_my_orders": "📦 Siparişlerim",
+    "button_fees": "💰 Komisyonlar",
+    "button_help": "ℹ️ Nasıl Çalışır?",
+    "button_support": "📞 Destek",
+    "button_iban_to_crypto": "🏦 IBAN → Kripto",
+    "button_crypto_to_iban": "💳 Kripto → IBAN",
+    "button_crypto_to_crypto": "🔄 Kripto → Kripto",
+    "button_main_menu": "⬅️ Ana Menü",
+    "button_back": "⬅️ Geri",
+}
+
+for key, default_value in MESSAGE_DEFAULTS.items():
+    messages.setdefault(key, default_value)
+
+save_json("messages.json", messages)
+
+
 def api(method, data):
     try:
         return requests.post(
@@ -79,17 +122,14 @@ def coin_label(symbol):
 def menu(chat_id):
     send(
         chat_id,
-        messages.get(
-            "welcome",
-            "👋 Zaqel Swap'a hoş geldiniz."
-        ),
+        messages.get("welcome", MESSAGE_DEFAULTS["welcome"]),
         {
             "inline_keyboard": [
-                [{"text": "🔄 Swap Başlat", "callback_data": "swap"}],
-                [{"text": "📦 Siparişlerim", "callback_data": "orders"}],
-                [{"text": "💰 Komisyonlar", "callback_data": "fees"}],
-                [{"text": "ℹ️ Nasıl Çalışır?", "callback_data": "help"}],
-                [{"text": "📞 Destek", "callback_data": "support"}],
+                [{"text": messages.get("button_start_swap", MESSAGE_DEFAULTS["button_start_swap"]), "callback_data": "swap"}],
+                [{"text": messages.get("button_my_orders", MESSAGE_DEFAULTS["button_my_orders"]), "callback_data": "orders"}],
+                [{"text": messages.get("button_fees", MESSAGE_DEFAULTS["button_fees"]), "callback_data": "fees"}],
+                [{"text": messages.get("button_help", MESSAGE_DEFAULTS["button_help"]), "callback_data": "help"}],
+                [{"text": messages.get("button_support", MESSAGE_DEFAULTS["button_support"]), "callback_data": "support"}],
             ]
         },
     )
@@ -98,13 +138,13 @@ def menu(chat_id):
 def swap_menu(chat_id):
     send(
         chat_id,
-        messages.get("swap_menu", "🔄 İşlem türünü seçiniz:"),
+        messages.get("swap_menu", MESSAGE_DEFAULTS["swap_menu"]),
         {
             "inline_keyboard": [
-                [{"text": "🏦 IBAN → Kripto", "callback_data": "type_iban_to_crypto"}],
-                [{"text": "💳 Kripto → IBAN", "callback_data": "type_crypto_to_iban"}],
-                [{"text": "🔄 Kripto → Kripto", "callback_data": "type_crypto_to_crypto"}],
-                [{"text": "⬅️ Ana Menü", "callback_data": "main"}],
+                [{"text": messages.get("button_iban_to_crypto", MESSAGE_DEFAULTS["button_iban_to_crypto"]), "callback_data": "type_iban_to_crypto"}],
+                [{"text": messages.get("button_crypto_to_iban", MESSAGE_DEFAULTS["button_crypto_to_iban"]), "callback_data": "type_crypto_to_iban"}],
+                [{"text": messages.get("button_crypto_to_crypto", MESSAGE_DEFAULTS["button_crypto_to_crypto"]), "callback_data": "type_crypto_to_crypto"}],
+                [{"text": messages.get("button_main_menu", MESSAGE_DEFAULTS["button_main_menu"]), "callback_data": "main"}],
             ]
         },
     )
@@ -112,6 +152,7 @@ def swap_menu(chat_id):
 
 def coin_menu(chat_id, prefix, exclude=None, message_text="Coin seçiniz:"):
     rows = []
+
     for symbol in active_coins():
         if symbol != exclude:
             rows.append(
@@ -121,7 +162,11 @@ def coin_menu(chat_id, prefix, exclude=None, message_text="Coin seçiniz:"):
                 }]
             )
 
-    rows.append([{"text": "⬅️ Geri", "callback_data": "swap"}])
+    rows.append([{
+        "text": messages.get("button_back", MESSAGE_DEFAULTS["button_back"]),
+        "callback_data": "swap",
+    }])
+
     send(chat_id, message_text, {"inline_keyboard": rows})
 
 
@@ -217,13 +262,14 @@ def my_orders(chat_id):
         if str(o.get("chat_id")) == str(chat_id)
     ]
     if found:
-        send(chat_id, "📦 Siparişlerin:\n\n" + "\n".join(found))
+        send(chat_id, messages.get("orders_title", MESSAGE_DEFAULTS["orders_title"]) + "\n\n" + "\n".join(found))
     else:
-        send(chat_id, "📦 Henüz siparişin yok.")
+        send(chat_id, messages.get("orders_empty", MESSAGE_DEFAULTS["orders_empty"]))
 
 
-def update_order_status(oid, new_status):
+def update_order_status(oid, new_status, reject_reason=""):
     oid = str(oid)
+
     with data_lock:
         order = orders.get(oid)
         if not order:
@@ -232,23 +278,27 @@ def update_order_status(oid, new_status):
         if new_status == "completed":
             order["status"] = "✅ Tamamlandı"
             order["completed_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            user_message = messages.get(
-                "order_completed",
-                "✅ Siparişiniz tamamlandı."
-            )
+            order["archived"] = False
+            user_message = messages.get("order_completed", MESSAGE_DEFAULTS["order_completed"])
+
         elif new_status == "rejected":
             order["status"] = "❌ Reddedildi"
             order["rejected_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            user_message = messages.get(
-                "order_rejected",
-                "❌ Siparişiniz reddedildi."
-            )
+            order["reject_reason"] = reject_reason.strip()
+            order["archived"] = False
+            user_message = messages.get("order_rejected", MESSAGE_DEFAULTS["order_rejected"])
+
         else:
             return False, "Geçersiz durum."
 
         save_json("orders.json", orders)
 
-    send(order.get("chat_id"), f"{user_message}\n\nSipariş No: #{oid}")
+    notification = f"{user_message}\n\nSipariş No: #{oid}"
+
+    if new_status == "rejected" and reject_reason.strip():
+        notification += f"\nRed sebebi: {reject_reason.strip()}"
+
+    send(order.get("chat_id"), notification)
     return True, order["status"]
 
 
@@ -351,7 +401,7 @@ def bot_loop():
                         send(
                             chat_id,
                             (
-                                "💰 Komisyonlar:\n\n"
+                                messages.get("fees_title", MESSAGE_DEFAULTS["fees_title"]) + "\n\n"
                                 f"🔄 Kripto → Kripto: %{settings.get('fee_crypto_to_crypto', '0')}\n"
                                 f"🏦 IBAN → Kripto: %{settings.get('fee_iban_to_crypto', '0')}\n"
                                 f"💳 Kripto → IBAN: %{settings.get('fee_crypto_to_iban', '0')}"
@@ -381,7 +431,7 @@ def bot_loop():
 
                     elif data == "type_iban_to_crypto":
                         if settings.get("iban_active") != "on":
-                            send(chat_id, "❌ Şu anda IBAN ile ödeme kapalıdır.")
+                            send(chat_id, messages.get("iban_closed", MESSAGE_DEFAULTS["iban_closed"]))
                         else:
                             user_state[chat_id] = {"type": "iban_to_crypto"}
                             coin_menu(
@@ -408,7 +458,7 @@ def bot_loop():
                         coin = data.replace("from_", "")
                         s = user_state.get(chat_id)
                         if not s:
-                            send(chat_id, "❌ İşlem süresi doldu. Lütfen tekrar başlayın.")
+                            send(chat_id, messages.get("session_expired", MESSAGE_DEFAULTS["session_expired"]))
                             continue
 
                         s["from_coin"] = coin
@@ -419,8 +469,8 @@ def bot_loop():
                                 "to",
                                 exclude=coin,
                                 message_text=messages.get(
-                                    "coin_select_crypto_to_crypto",
-                                    "🔄 Alacağınız kripto para birimini seçiniz."
+                                    "coin_select_crypto_to_crypto_receive",
+                                    MESSAGE_DEFAULTS["coin_select_crypto_to_crypto_receive"]
                                 ),
                             )
                         else:
@@ -437,7 +487,7 @@ def bot_loop():
                         coin = data.replace("to_", "")
                         s = user_state.get(chat_id)
                         if not s:
-                            send(chat_id, "❌ İşlem süresi doldu. Lütfen tekrar başlayın.")
+                            send(chat_id, messages.get("session_expired", MESSAGE_DEFAULTS["session_expired"]))
                             continue
 
                         s["to_coin"] = coin
@@ -565,6 +615,176 @@ def logout():
     return redirect("/login")
 
 
+def order_counts():
+    counts = {
+        "active": 0,
+        "completed": 0,
+        "rejected": 0,
+        "all": len(orders),
+    }
+
+    for order in orders.values():
+        status = order.get("status", "")
+        archived = order.get("archived") is True
+
+        if status == "⏳ Bekliyor":
+            counts["active"] += 1
+        elif status == "✅ Tamamlandı" and not archived:
+            counts["completed"] += 1
+        elif status == "❌ Reddedildi" and not archived:
+            counts["rejected"] += 1
+
+    return counts
+
+
+def render_order_cards(view="active"):
+    cards = ""
+
+    sorted_orders = sorted(
+        orders.items(),
+        key=lambda item: item[1].get("created_at", ""),
+        reverse=True,
+    )
+
+    for oid, order in sorted_orders:
+        status = order.get("status", "Bilinmiyor")
+        archived = order.get("archived") is True
+
+        if view == "active" and status != "⏳ Bekliyor":
+            continue
+        if view == "completed" and (status != "✅ Tamamlandı" or archived):
+            continue
+        if view == "rejected" and (status != "❌ Reddedildi" or archived):
+            continue
+
+        is_pending = status == "⏳ Bekliyor"
+
+        if is_pending:
+            status_class = "pending"
+        elif status == "✅ Tamamlandı":
+            status_class = "completed"
+        else:
+            status_class = "rejected"
+
+        details = [
+            ("Sipariş No", f"#{oid}"),
+            ("Kullanıcı", f"@{order.get('username', 'unknown')}"),
+            ("Telegram ID", order.get("chat_id", "")),
+            ("Tür", order_type_name(order.get("type"))),
+            ("Miktar", order.get("amount", "")),
+            ("Gönderilen Coin", order.get("from_coin", "-")),
+            ("Alınacak Coin", order.get("to_coin", "-")),
+            ("Cüzdan", order.get("wallet", "-")),
+            ("IBAN", order.get("iban", "-")),
+            ("Ad Soyad", order.get("name", "-")),
+            ("Oluşturulma", order.get("created_at", "-")),
+            ("Durum", status),
+        ]
+
+        if order.get("completed_at"):
+            details.append(("Tamamlanma", order.get("completed_at")))
+
+        if order.get("rejected_at"):
+            details.append(("Reddedilme", order.get("rejected_at")))
+
+        if order.get("reject_reason"):
+            details.append(("Red Sebebi", order.get("reject_reason")))
+
+        if archived:
+            details.append(("Liste Durumu", "Ana listelerden kaldırıldı"))
+
+        details_html = "".join(
+            f"<div class='detail'><span>{h(label)}</span><strong>{h(value)}</strong></div>"
+            for label, value in details
+        )
+
+        actions_html = ""
+
+        if is_pending:
+            actions_html = f"""
+            <div class="actions">
+                <form method="post" onsubmit="return confirm('Bu sipariş tamamlandı olarak işaretlensin mi?')">
+                    <input type="hidden" name="action" value="complete_order">
+                    <input type="hidden" name="order_id" value="{h(oid)}">
+                    <input type="hidden" name="return_view" value="{h(view)}">
+                    <button class="complete" type="submit">✅ Tamamla</button>
+                </form>
+
+                <form method="post" onsubmit="return confirm('Bu sipariş reddedilsin mi?')">
+                    <input type="hidden" name="action" value="reject_order">
+                    <input type="hidden" name="order_id" value="{h(oid)}">
+                    <input type="hidden" name="return_view" value="{h(view)}">
+                    <textarea class="reject-reason" name="reject_reason" placeholder="Red sebebi yazın..." required></textarea>
+                    <button class="reject" type="submit">❌ Reddet</button>
+                </form>
+            </div>
+            """
+
+        elif not archived:
+            actions_html = f"""
+            <div class="single-action">
+                <form method="post" onsubmit="return confirm('Bu sipariş ana listeden kaldırılsın mı? Tüm Siparişler bölümünde görünmeye devam eder.')">
+                    <input type="hidden" name="action" value="archive_order">
+                    <input type="hidden" name="order_id" value="{h(oid)}">
+                    <input type="hidden" name="return_view" value="{h(view)}">
+                    <button class="archive" type="submit">🗂️ Listeden Kaldır</button>
+                </form>
+            </div>
+            """
+
+        else:
+            actions_html = f"""
+            <div class="single-action">
+                <form method="post">
+                    <input type="hidden" name="action" value="restore_order">
+                    <input type="hidden" name="order_id" value="{h(oid)}">
+                    <input type="hidden" name="return_view" value="{h(view)}">
+                    <button class="restore" type="submit">↩️ Listeye Geri Al</button>
+                </form>
+            </div>
+            """
+
+        cards += f"""
+        <article class="order-card {status_class}">
+            <div class="order-head">
+                <h3>#{h(oid)}</h3>
+                <span class="status">{h(status)}</span>
+            </div>
+
+            <div class="details">
+                {details_html}
+            </div>
+
+            {actions_html}
+        </article>
+        """
+
+    empty_texts = {
+        "active": "Bekleyen sipariş bulunmuyor.",
+        "completed": "Listede tamamlanmış sipariş bulunmuyor.",
+        "rejected": "Listede reddedilmiş sipariş bulunmuyor.",
+        "all": "Henüz sipariş bulunmuyor.",
+    }
+
+    if not cards:
+        cards = f"<div class='empty-state'>📭 {h(empty_texts.get(view, 'Sipariş bulunmuyor.'))}</div>"
+
+    return cards
+
+
+@app.route("/admin/orders-fragment")
+def admin_orders_fragment():
+    if not logged_in():
+        return "", 401
+
+    view = request.args.get("view", "active")
+
+    if view not in {"active", "completed", "rejected", "all"}:
+        view = "active"
+
+    return render_order_cards(view)
+
+
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if not logged_in():
@@ -577,11 +797,15 @@ def admin():
             for key in list(settings.keys()):
                 settings[key] = request.form.get(key, "")
 
-            for key in list(messages.keys()):
-                messages[key] = request.form.get(key, "")
+            for key in MESSAGE_DEFAULTS.keys():
+                messages[key] = request.form.get(
+                    key,
+                    messages.get(key, MESSAGE_DEFAULTS[key]),
+                )
 
         elif action == "add_coin":
             symbol = request.form.get("symbol", "").upper().strip()
+
             if symbol:
                 coins[symbol] = {
                     "name": request.form.get("name", ""),
@@ -595,117 +819,97 @@ def admin():
         elif action == "update_coins":
             for symbol in list(coins.keys()):
                 coins[symbol]["name"] = request.form.get(
-                    f"name_{symbol}", coins[symbol].get("name", "")
+                    f"name_{symbol}",
+                    coins[symbol].get("name", ""),
                 )
                 coins[symbol]["emoji"] = request.form.get(
-                    f"emoji_{symbol}", coins[symbol].get("emoji", "🪙")
+                    f"emoji_{symbol}",
+                    coins[symbol].get("emoji", "🪙"),
                 )
                 coins[symbol]["network"] = request.form.get(
-                    f"network_{symbol}", coins[symbol].get("network", "")
+                    f"network_{symbol}",
+                    coins[symbol].get("network", ""),
                 )
                 coins[symbol]["address"] = request.form.get(
-                    f"address_{symbol}", coins[symbol].get("address", "")
+                    f"address_{symbol}",
+                    coins[symbol].get("address", ""),
                 )
                 coins[symbol]["logo"] = request.form.get(
-                    f"logo_{symbol}", coins[symbol].get("logo", "")
+                    f"logo_{symbol}",
+                    coins[symbol].get("logo", ""),
                 )
                 coins[symbol]["active"] = request.form.get(
-                    f"active_{symbol}", "off"
+                    f"active_{symbol}",
+                    "off",
                 )
 
         elif action == "complete_order":
-            update_order_status(request.form.get("order_id", ""), "completed")
+            update_order_status(
+                request.form.get("order_id", ""),
+                "completed",
+            )
 
         elif action == "reject_order":
-            update_order_status(request.form.get("order_id", ""), "rejected")
+            update_order_status(
+                request.form.get("order_id", ""),
+                "rejected",
+                request.form.get("reject_reason", ""),
+            )
+
+        elif action == "archive_order":
+            oid = str(request.form.get("order_id", ""))
+
+            if oid in orders and orders[oid].get("status") != "⏳ Bekliyor":
+                orders[oid]["archived"] = True
+
+        elif action == "restore_order":
+            oid = str(request.form.get("order_id", ""))
+
+            if oid in orders:
+                orders[oid]["archived"] = False
 
         save_json("settings.json", settings)
         save_json("messages.json", messages)
         save_json("coins.json", coins)
         save_json("orders.json", orders)
-        return redirect("/admin")
+
+        return_view = request.form.get("return_view", "active")
+
+        if return_view not in {"active", "completed", "rejected", "all"}:
+            return_view = "active"
+
+        return redirect(f"/admin?view={return_view}")
+
+    current_view = request.args.get("view", "active")
+
+    if current_view not in {"active", "completed", "rejected", "all"}:
+        current_view = "active"
+
+    counts = order_counts()
+    order_cards = render_order_cards(current_view)
 
     coin_rows = ""
-    for symbol, c in coins.items():
-        checked = "checked" if c.get("active") == "on" else ""
+
+    for symbol, coin in coins.items():
+        checked = "checked" if coin.get("active") == "on" else ""
+
         coin_rows += f"""
         <tr>
             <td><strong>{h(symbol)}</strong></td>
-            <td><input name="emoji_{h(symbol)}" value="{h(c.get('emoji', ''))}" class="small"></td>
-            <td><input name="name_{h(symbol)}" value="{h(c.get('name', ''))}"></td>
-            <td><input name="network_{h(symbol)}" value="{h(c.get('network', ''))}"></td>
-            <td><input name="address_{h(symbol)}" value="{h(c.get('address', ''))}"></td>
-            <td><input name="logo_{h(symbol)}" value="{h(c.get('logo', ''))}"></td>
+            <td><input name="emoji_{h(symbol)}" value="{h(coin.get('emoji', ''))}" class="small"></td>
+            <td><input name="name_{h(symbol)}" value="{h(coin.get('name', ''))}"></td>
+            <td><input name="network_{h(symbol)}" value="{h(coin.get('network', ''))}"></td>
+            <td><input name="address_{h(symbol)}" value="{h(coin.get('address', ''))}"></td>
+            <td><input name="logo_{h(symbol)}" value="{h(coin.get('logo', ''))}"></td>
             <td><input type="checkbox" name="active_{h(symbol)}" value="on" {checked}></td>
         </tr>
         """
 
-    order_cards = ""
-    sorted_orders = sorted(
-        orders.items(),
-        key=lambda item: item[1].get("created_at", ""),
-        reverse=True,
-    )
-
-    for oid, o in sorted_orders:
-        status = o.get("status", "Bilinmiyor")
-        is_pending = status == "⏳ Bekliyor"
-
-        details = [
-            ("Sipariş No", f"#{oid}"),
-            ("Kullanıcı", f"@{o.get('username', 'unknown')}"),
-            ("Telegram ID", o.get("chat_id", "")),
-            ("Tür", order_type_name(o.get("type"))),
-            ("Miktar", o.get("amount", "")),
-            ("Gönderilen Coin", o.get("from_coin", "-")),
-            ("Alınacak Coin", o.get("to_coin", "-")),
-            ("Cüzdan", o.get("wallet", "-")),
-            ("IBAN", o.get("iban", "-")),
-            ("Ad Soyad", o.get("name", "-")),
-            ("Oluşturulma", o.get("created_at", "-")),
-            ("Durum", status),
-        ]
-
-        detail_html = "".join(
-            f"<div class='detail'><span>{h(label)}</span><strong>{h(value)}</strong></div>"
-            for label, value in details
-        )
-
-        buttons = ""
-        if is_pending:
-            buttons = f"""
-            <div class="actions">
-                <form method="post" onsubmit="return confirm('Bu sipariş tamamlandı olarak işaretlensin mi?')">
-                    <input type="hidden" name="action" value="complete_order">
-                    <input type="hidden" name="order_id" value="{h(oid)}">
-                    <button class="complete" type="submit">✅ Tamamla</button>
-                </form>
-                <form method="post" onsubmit="return confirm('Bu sipariş reddedilsin mi?')">
-                    <input type="hidden" name="action" value="reject_order">
-                    <input type="hidden" name="order_id" value="{h(oid)}">
-                    <button class="reject" type="submit">❌ Reddet</button>
-                </form>
-            </div>
-            """
-
-        order_cards += f"""
-        <article class="order-card">
-            <div class="order-head">
-                <h3>#{h(oid)}</h3>
-                <span class="status">{h(status)}</span>
-            </div>
-            <div class="details">{detail_html}</div>
-            {buttons}
-        </article>
-        """
-
-    if not order_cards:
-        order_cards = "<p>Henüz sipariş bulunmuyor.</p>"
-
     message_fields = [
         ("welcome", "Hoş geldin mesajı"),
         ("swap_menu", "İşlem türü seçim mesajı"),
-        ("coin_select_crypto_to_crypto", "Kripto → Kripto coin seçim mesajı"),
+        ("coin_select_crypto_to_crypto", "Kripto → Kripto: gönderilecek coin seçim mesajı"),
+        ("coin_select_crypto_to_crypto_receive", "Kripto → Kripto: alınacak coin seçim mesajı"),
         ("coin_select_iban_to_crypto", "IBAN → Kripto coin seçim mesajı"),
         ("coin_select_crypto_to_iban", "Kripto → IBAN coin seçim mesajı"),
         ("amount_question_crypto_to_crypto", "Kripto → Kripto miktar sorusu"),
@@ -717,15 +921,35 @@ def admin():
         ("order_created", "Sipariş oluşturuldu mesajı"),
         ("order_completed", "Sipariş tamamlandı mesajı"),
         ("order_rejected", "Sipariş reddedildi mesajı"),
+        ("orders_title", "Siparişlerim başlığı"),
+        ("orders_empty", "Sipariş yok mesajı"),
+        ("fees_title", "Komisyonlar başlığı"),
+        ("iban_closed", "IBAN kapalı mesajı"),
+        ("session_expired", "İşlem süresi doldu mesajı"),
         ("help", "Nasıl çalışır mesajı"),
         ("support", "Destek mesajı"),
         ("iban_warning", "IBAN uyarı mesajı"),
         ("working_hours", "Çalışma saatleri"),
     ]
 
+    button_fields = [
+        ("button_start_swap", "Ana menü: Swap Başlat"),
+        ("button_my_orders", "Ana menü: Siparişlerim"),
+        ("button_fees", "Ana menü: Komisyonlar"),
+        ("button_help", "Ana menü: Nasıl Çalışır?"),
+        ("button_support", "Ana menü: Destek"),
+        ("button_iban_to_crypto", "İşlem türü: IBAN → Kripto"),
+        ("button_crypto_to_iban", "İşlem türü: Kripto → IBAN"),
+        ("button_crypto_to_crypto", "İşlem türü: Kripto → Kripto"),
+        ("button_main_menu", "Ana Menü butonu"),
+        ("button_back", "Geri butonu"),
+    ]
+
     message_inputs = ""
+
     for key, label in message_fields:
-        value = messages.get(key, "")
+        value = messages.get(key, MESSAGE_DEFAULTS.get(key, ""))
+
         if key == "working_hours":
             message_inputs += (
                 f"<label>{h(label)}</label>"
@@ -737,221 +961,536 @@ def admin():
                 f"<textarea name='{h(key)}'>{h(value)}</textarea>"
             )
 
+    button_inputs = ""
+
+    for key, label in button_fields:
+        button_inputs += (
+            f"<label>{h(label)}</label>"
+            f"<input name='{h(key)}' value='{h(messages.get(key, MESSAGE_DEFAULTS.get(key, '')))}'>"
+        )
+
     return f"""
     <!doctype html>
     <html lang="tr">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Zaqel Admin</title>
+
         <style>
             :root {{
                 color-scheme: dark;
-                --bg: #0b0d12;
-                --panel: #151922;
-                --panel-2: #0f131b;
-                --border: #2a3040;
-                --text: #f4f7fb;
-                --muted: #98a2b3;
-                --red: #ef3340;
-                --green: #25b56a;
+                --bg: #080b12;
+                --panel: rgba(20, 25, 36, 0.86);
+                --panel-solid: #111722;
+                --input: #0c111a;
+                --border: #293246;
+                --text: #f6f8fc;
+                --muted: #96a0b4;
+                --red: #ff4758;
+                --green: #28c77a;
+                --blue: #607dff;
+                --purple: #9265ff;
+                --orange: #f4a62a;
+                --shadow: 0 20px 60px rgba(0, 0, 0, .32);
             }}
-            * {{ box-sizing: border-box; }}
+
+            * {{
+                box-sizing: border-box;
+            }}
+
             body {{
                 margin: 0;
-                font-family: Arial, sans-serif;
-                background: var(--bg);
+                min-height: 100vh;
+                font-family: Inter, Arial, sans-serif;
                 color: var(--text);
+                background:
+                    radial-gradient(circle at 10% 0%, rgba(96, 125, 255, .18), transparent 34%),
+                    radial-gradient(circle at 90% 4%, rgba(146, 101, 255, .16), transparent 30%),
+                    var(--bg);
             }}
+
             .container {{
-                width: min(1280px, calc(100% - 28px));
+                width: min(1380px, calc(100% - 28px));
                 margin: 0 auto;
-                padding: 24px 0 60px;
+                padding: 26px 0 70px;
             }}
+
             .topbar {{
+                position: sticky;
+                top: 12px;
+                z-index: 20;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                gap: 16px;
+                gap: 18px;
+                padding: 16px 18px;
                 margin-bottom: 22px;
-            }}
-            a {{ color: #ff6872; }}
-            .box {{
-                background: var(--panel);
                 border: 1px solid var(--border);
-                border-radius: 16px;
-                padding: 20px;
-                margin-bottom: 20px;
+                border-radius: 18px;
+                background: rgba(11, 15, 23, .82);
+                backdrop-filter: blur(18px);
+                box-shadow: var(--shadow);
             }}
-            h1, h2, h3 {{ margin-top: 0; }}
+
+            .brand h1 {{
+                margin: 0;
+                font-size: clamp(23px, 4vw, 34px);
+            }}
+
+            .brand p {{
+                margin: 5px 0 0;
+                color: var(--muted);
+            }}
+
+            .logout {{
+                color: white;
+                text-decoration: none;
+                border: 1px solid var(--border);
+                border-radius: 11px;
+                padding: 10px 14px;
+                background: rgba(255, 255, 255, .04);
+            }}
+
+            .box {{
+                padding: 22px;
+                margin-bottom: 20px;
+                border: 1px solid var(--border);
+                border-radius: 20px;
+                background: var(--panel);
+                backdrop-filter: blur(16px);
+                box-shadow: var(--shadow);
+            }}
+
+            h2 {{
+                margin: 0 0 14px;
+            }}
+
+            .section-note {{
+                color: var(--muted);
+                line-height: 1.55;
+                margin-bottom: 16px;
+            }}
+
             label {{
                 display: block;
                 color: var(--muted);
                 margin: 14px 0 7px;
+                font-size: 14px;
             }}
-            input, textarea {{
-                width: 100%;
-                background: var(--panel-2);
-                color: white;
-                border: 1px solid #343b4e;
-                border-radius: 9px;
-                padding: 10px;
-            }}
+
+            input,
             textarea {{
-                min-height: 78px;
+                width: 100%;
+                color: white;
+                background: var(--input);
+                border: 1px solid #344058;
+                border-radius: 11px;
+                padding: 11px 12px;
+                outline: none;
+                transition: border-color .2s, box-shadow .2s;
+            }}
+
+            input:focus,
+            textarea:focus {{
+                border-color: var(--blue);
+                box-shadow: 0 0 0 3px rgba(96, 125, 255, .14);
+            }}
+
+            textarea {{
+                min-height: 88px;
                 resize: vertical;
             }}
+
             button {{
                 border: 0;
-                border-radius: 9px;
-                padding: 10px 16px;
+                border-radius: 11px;
+                padding: 11px 17px;
                 color: white;
-                font-weight: bold;
+                font-weight: 700;
                 cursor: pointer;
-                background: var(--red);
+                background: linear-gradient(135deg, var(--red), #d92d42);
+                transition: transform .18s, opacity .18s;
             }}
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-                min-width: 920px;
+
+            button:hover {{
+                transform: translateY(-1px);
+                opacity: .94;
             }}
-            th, td {{
-                border-bottom: 1px solid var(--border);
-                padding: 10px;
-                text-align: left;
-                vertical-align: middle;
+
+            .tabs {{
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin: 16px 0 20px;
             }}
-            .table-wrap {{ overflow-x: auto; }}
-            .small {{ min-width: 70px; }}
+
+            .tab {{
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 10px 14px;
+                color: var(--muted);
+                text-decoration: none;
+                border: 1px solid var(--border);
+                border-radius: 999px;
+                background: rgba(10, 14, 22, .72);
+            }}
+
+            .tab.active {{
+                color: white;
+                border-color: var(--blue);
+                background: rgba(96, 125, 255, .18);
+                box-shadow: 0 0 0 3px rgba(96, 125, 255, .08);
+            }}
+
+            .count {{
+                min-width: 24px;
+                height: 24px;
+                display: inline-grid;
+                place-items: center;
+                padding: 0 7px;
+                border-radius: 999px;
+                font-size: 12px;
+                background: rgba(255, 255, 255, .08);
+            }}
+
             .order-grid {{
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
                 gap: 16px;
             }}
+
             .order-card {{
-                background: var(--panel-2);
+                padding: 17px;
                 border: 1px solid var(--border);
-                border-radius: 14px;
-                padding: 16px;
+                border-radius: 16px;
+                background: linear-gradient(180deg, rgba(17, 23, 34, .98), rgba(10, 14, 22, .98));
+                box-shadow: 0 14px 36px rgba(0, 0, 0, .22);
+                transition: transform .2s, border-color .2s;
             }}
+
+            .order-card:hover {{
+                transform: translateY(-2px);
+                border-color: #48546e;
+            }}
+
+            .order-card.pending {{
+                border-top: 3px solid var(--orange);
+            }}
+
+            .order-card.completed {{
+                border-top: 3px solid var(--green);
+            }}
+
+            .order-card.rejected {{
+                border-top: 3px solid var(--red);
+            }}
+
             .order-head {{
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 gap: 12px;
-                border-bottom: 1px solid var(--border);
                 padding-bottom: 12px;
                 margin-bottom: 12px;
+                border-bottom: 1px solid var(--border);
             }}
-            .order-head h3 {{ margin: 0; }}
+
+            .order-head h3 {{
+                margin: 0;
+            }}
+
             .status {{
                 font-size: 14px;
-                color: #d5d9e2;
+                color: #d7dce8;
             }}
+
             .details {{
                 display: grid;
-                gap: 8px;
+                gap: 7px;
             }}
+
             .detail {{
                 display: flex;
                 justify-content: space-between;
                 gap: 12px;
                 padding: 7px 0;
-                border-bottom: 1px dashed #262c39;
+                border-bottom: 1px dashed #263044;
             }}
-            .detail span {{ color: var(--muted); }}
+
+            .detail span {{
+                color: var(--muted);
+            }}
+
             .detail strong {{
                 max-width: 62%;
                 text-align: right;
                 overflow-wrap: anywhere;
             }}
+
             .actions {{
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 10px;
                 margin-top: 16px;
+                align-items: start;
             }}
-            .actions form {{ margin: 0; }}
-            .actions button {{ width: 100%; }}
-            .complete {{ background: var(--green); }}
-            .reject {{ background: var(--red); }}
-            .save {{ margin-top: 18px; }}
-            @media (max-width: 650px) {{
-                .container {{ width: min(100% - 18px, 1280px); }}
-                .topbar {{ align-items: flex-start; }}
-                .box {{ padding: 15px; border-radius: 12px; }}
-                .detail {{ display: block; }}
+
+            .actions form {{
+                margin: 0;
+            }}
+
+            .actions button {{
+                width: 100%;
+            }}
+
+            .reject-reason {{
+                min-height: 76px;
+                margin-bottom: 8px;
+            }}
+
+            .complete {{
+                background: linear-gradient(135deg, var(--green), #16995a);
+            }}
+
+            .reject {{
+                background: linear-gradient(135deg, var(--red), #d62f44);
+            }}
+
+            .archive {{
+                width: 100%;
+                background: linear-gradient(135deg, #465066, #323a4b);
+            }}
+
+            .restore {{
+                width: 100%;
+                background: linear-gradient(135deg, var(--blue), #455ad6);
+            }}
+
+            .single-action {{
+                margin-top: 16px;
+            }}
+
+            .two-col {{
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 20px;
+            }}
+
+            .settings-grid {{
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 20px;
+            }}
+
+            .save {{
+                width: 100%;
+                margin: 2px 0 20px;
+                padding: 14px;
+                font-size: 16px;
+                background: linear-gradient(135deg, var(--blue), var(--purple));
+            }}
+
+            .table-wrap {{
+                overflow-x: auto;
+            }}
+
+            table {{
+                width: 100%;
+                min-width: 980px;
+                border-collapse: collapse;
+            }}
+
+            th,
+            td {{
+                padding: 11px;
+                text-align: left;
+                vertical-align: middle;
+                border-bottom: 1px solid var(--border);
+            }}
+
+            .small {{
+                min-width: 70px;
+            }}
+
+            .empty-state {{
+                grid-column: 1 / -1;
+                padding: 44px 20px;
+                text-align: center;
+                color: var(--muted);
+                border: 1px dashed var(--border);
+                border-radius: 16px;
+            }}
+
+            @media (max-width: 980px) {{
+                .two-col,
+                .settings-grid {{
+                    grid-template-columns: 1fr;
+                }}
+            }}
+
+            @media (max-width: 680px) {{
+                .container {{
+                    width: min(100% - 16px, 1380px);
+                }}
+
+                .topbar {{
+                    top: 7px;
+                    align-items: flex-start;
+                }}
+
+                .box {{
+                    padding: 15px;
+                    border-radius: 15px;
+                }}
+
+                .order-grid {{
+                    grid-template-columns: 1fr;
+                }}
+
+                .detail {{
+                    display: block;
+                }}
+
                 .detail strong {{
                     display: block;
                     max-width: 100%;
-                    text-align: left;
                     margin-top: 4px;
+                    text-align: left;
+                }}
+
+                .actions {{
+                    grid-template-columns: 1fr;
                 }}
             }}
         </style>
     </head>
+
     <body>
         <main class="container">
-            <div class="topbar">
-                <div>
-                    <h1>⚙️ Zaqel Admin Panel</h1>
-                    <div style="color:var(--muted)">Bot ve sipariş kontrol alanı</div>
+            <header class="topbar">
+                <div class="brand">
+                    <h1>⚙️ Zaqel Control Center</h1>
+                    <p>Bot, mesaj, buton, coin ve sipariş yönetimi</p>
                 </div>
-                <a href="/logout">Çıkış</a>
-            </div>
+
+                <a class="logout" href="/logout">Çıkış</a>
+            </header>
 
             <section class="box">
                 <h2>📦 Sipariş Kontrol Alanı</h2>
-                <div class="order-grid">{order_cards}</div>
+
+                <div class="section-note">
+                    Bekleyen siparişler ana ekranda kalır. Tamamlanan veya reddedilen siparişleri
+                    listeden kaldırabilirsiniz; Tüm Siparişler bölümünde her zaman görünmeye devam ederler.
+                </div>
+
+                <nav class="tabs">
+                    <a class="tab {'active' if current_view == 'active' else ''}" href="/admin?view=active">
+                        ⏳ Bekleyen <span class="count">{counts['active']}</span>
+                    </a>
+
+                    <a class="tab {'active' if current_view == 'completed' else ''}" href="/admin?view=completed">
+                        ✅ Tamamlanan <span class="count">{counts['completed']}</span>
+                    </a>
+
+                    <a class="tab {'active' if current_view == 'rejected' else ''}" href="/admin?view=rejected">
+                        ❌ Reddedilen <span class="count">{counts['rejected']}</span>
+                    </a>
+
+                    <a class="tab {'active' if current_view == 'all' else ''}" href="/admin?view=all">
+                        📚 Tüm Siparişler <span class="count">{counts['all']}</span>
+                    </a>
+                </nav>
+
+                <div
+                    id="order-grid"
+                    class="order-grid"
+                    data-view="{h(current_view)}"
+                >
+                    {order_cards}
+                </div>
             </section>
 
             <form method="post">
                 <input type="hidden" name="action" value="settings">
+                <input type="hidden" name="return_view" value="{h(current_view)}">
 
-                <section class="box">
-                    <h2>📝 Bot Mesajları</h2>
-                    {message_inputs}
-                </section>
+                <div class="two-col">
+                    <section class="box">
+                        <h2>📝 Bot Mesajları</h2>
+                        <div class="section-note">
+                            Kullanıcıya gönderilen temel bot metinlerinin tamamını buradan düzenleyebilirsiniz.
+                        </div>
+                        {message_inputs}
+                    </section>
 
-                <section class="box">
-                    <h2>💰 Komisyon Yönetimi</h2>
-                    <label>Kripto → Kripto %</label>
-                    <input name="fee_crypto_to_crypto" value="{h(settings.get('fee_crypto_to_crypto', ''))}">
-                    <label>IBAN → Kripto %</label>
-                    <input name="fee_iban_to_crypto" value="{h(settings.get('fee_iban_to_crypto', ''))}">
-                    <label>Kripto → IBAN %</label>
-                    <input name="fee_crypto_to_iban" value="{h(settings.get('fee_crypto_to_iban', ''))}">
-                </section>
+                    <section class="box">
+                        <h2>🔘 Buton Yazıları</h2>
+                        <div class="section-note">
+                            Telegram menülerindeki buton adlarını ve emojilerini buradan değiştirebilirsiniz.
+                        </div>
+                        {button_inputs}
+                    </section>
+                </div>
 
-                <section class="box">
-                    <h2>📉 Minimum Ödeme Yönetimi</h2>
-                    <label>Min Kripto → Kripto TL</label>
-                    <input name="min_crypto_to_crypto" value="{h(settings.get('min_crypto_to_crypto', ''))}">
-                    <label>Min IBAN → Kripto TL</label>
-                    <input name="min_iban_to_crypto" value="{h(settings.get('min_iban_to_crypto', ''))}">
-                    <label>Min Kripto → IBAN TL</label>
-                    <input name="min_crypto_to_iban" value="{h(settings.get('min_crypto_to_iban', ''))}">
-                </section>
+                <div class="settings-grid">
+                    <section class="box">
+                        <h2>💰 Komisyon Yönetimi</h2>
 
-                <section class="box">
-                    <h2>🏦 IBAN Yönetimi</h2>
-                    <label>Banka adı</label>
-                    <input name="bank_name" value="{h(settings.get('bank_name', ''))}">
-                    <label>IBAN</label>
-                    <input name="iban" value="{h(settings.get('iban', ''))}">
-                    <label>Alıcı adı soyadı</label>
-                    <input name="iban_owner" value="{h(settings.get('iban_owner', ''))}">
-                    <label>IBAN aktifliği: açık için on, kapalı için off</label>
-                    <input name="iban_active" value="{h(settings.get('iban_active', 'on'))}">
-                </section>
+                        <label>Kripto → Kripto %</label>
+                        <input name="fee_crypto_to_crypto" value="{h(settings.get('fee_crypto_to_crypto', ''))}">
 
-                <button class="save" type="submit">Genel Ayarları Kaydet</button>
+                        <label>IBAN → Kripto %</label>
+                        <input name="fee_iban_to_crypto" value="{h(settings.get('fee_iban_to_crypto', ''))}">
+
+                        <label>Kripto → IBAN %</label>
+                        <input name="fee_crypto_to_iban" value="{h(settings.get('fee_crypto_to_iban', ''))}">
+                    </section>
+
+                    <section class="box">
+                        <h2>📉 Minimum Ödeme</h2>
+
+                        <label>Min Kripto → Kripto TL</label>
+                        <input name="min_crypto_to_crypto" value="{h(settings.get('min_crypto_to_crypto', ''))}">
+
+                        <label>Min IBAN → Kripto TL</label>
+                        <input name="min_iban_to_crypto" value="{h(settings.get('min_iban_to_crypto', ''))}">
+
+                        <label>Min Kripto → IBAN TL</label>
+                        <input name="min_crypto_to_iban" value="{h(settings.get('min_crypto_to_iban', ''))}">
+                    </section>
+
+                    <section class="box">
+                        <h2>🏦 IBAN Yönetimi</h2>
+
+                        <label>Banka adı</label>
+                        <input name="bank_name" value="{h(settings.get('bank_name', ''))}">
+
+                        <label>IBAN</label>
+                        <input name="iban" value="{h(settings.get('iban', ''))}">
+
+                        <label>Alıcı adı soyadı</label>
+                        <input name="iban_owner" value="{h(settings.get('iban_owner', ''))}">
+
+                        <label>Aktiflik: on / off</label>
+                        <input name="iban_active" value="{h(settings.get('iban_active', 'on'))}">
+                    </section>
+                </div>
+
+                <button class="save" type="submit">
+                    💾 Tüm Mesaj, Buton ve Ayarları Kaydet
+                </button>
             </form>
 
             <section class="box">
                 <h2>🪙 Coin Yönetimi</h2>
+
                 <form method="post">
                     <input type="hidden" name="action" value="update_coins">
+                    <input type="hidden" name="return_view" value="{h(current_view)}">
+
                     <div class="table-wrap">
                         <table>
                             <tr>
@@ -966,6 +1505,7 @@ def admin():
                             {coin_rows}
                         </table>
                     </div>
+
                     <br>
                     <button type="submit">Coinleri Kaydet</button>
                 </form>
@@ -973,27 +1513,76 @@ def admin():
 
             <section class="box">
                 <h2>➕ Yeni Coin Ekle</h2>
+
                 <form method="post">
                     <input type="hidden" name="action" value="add_coin">
+                    <input type="hidden" name="return_view" value="{h(current_view)}">
+
                     <label>Sembol</label>
                     <input name="symbol" placeholder="BTC" required>
+
                     <label>Ad</label>
                     <input name="name" placeholder="Bitcoin">
-                    <label>Emoji/Renk</label>
+
+                    <label>Emoji</label>
                     <input name="emoji" placeholder="🟠">
+
                     <label>Ağ</label>
                     <input name="network" placeholder="BTC / BEP20 / ERC20">
+
                     <label>Ödeme Adresi</label>
                     <input name="address">
+
                     <label>Logo URL</label>
                     <input name="logo">
-                    <label>Aktif için on yaz</label>
+
+                    <label>Aktiflik: on / off</label>
                     <input name="active" value="on">
+
                     <br><br>
                     <button type="submit">Coin Ekle</button>
                 </form>
             </section>
         </main>
+
+        <script>
+            async function refreshOrders() {{
+                const activeElement = document.activeElement;
+
+                if (
+                    activeElement &&
+                    activeElement.classList &&
+                    activeElement.classList.contains("reject-reason")
+                ) {{
+                    return;
+                }}
+
+                const grid = document.getElementById("order-grid");
+
+                if (!grid) {{
+                    return;
+                }}
+
+                const view = grid.dataset.view || "active";
+
+                try {{
+                    const response = await fetch(
+                        "/admin/orders-fragment?view=" + encodeURIComponent(view),
+                        {{ cache: "no-store" }}
+                    );
+
+                    if (!response.ok) {{
+                        return;
+                    }}
+
+                    grid.innerHTML = await response.text();
+                }} catch (error) {{
+                    console.log("Sipariş yenileme hatası:", error);
+                }}
+            }}
+
+            setInterval(refreshOrders, 8000);
+        </script>
     </body>
     </html>
     """
