@@ -148,19 +148,27 @@ def bot_loop():
                     text = msg.get("text", "")
                     username = msg.get("from", {}).get("username", "unknown")
     
-    if text == "/start":
-        menu(chat_id)
+                     if text == "/start":
+                        menu(chat_id)
 
                     elif text == "/siparislerim":
                         my_orders(chat_id)
 
                     elif text.startswith("/tamamla") and str(chat_id) == str(ADMIN_CHAT_ID):
                         parts = text.split()
+
                         if len(parts) >= 2 and int(parts[1]) in orders:
                             oid = int(parts[1])
+
                             orders[oid]["status"] = "✅ Tamamlandı"
-                            send(orders[oid]["chat_id"], f"✅ Siparişin tamamlandı.\n\nSipariş No: #{oid}")
+
+                            send(
+                                orders[oid]["chat_id"],
+                                f"✅ Siparişin tamamlandı.\n\nSipariş No: #{oid}"
+                            )
+
                             send(chat_id, "✅ Sipariş tamamlandı.")
+
                         else:
                             send(chat_id, "❌ Sipariş bulunamadı.")
 
@@ -170,6 +178,7 @@ def bot_loop():
 
                         if step == "amount":
                             s["amount"] = text
+
                             if s["type"] in ["crypto_to_crypto", "iban_to_crypto"]:
                                 s["step"] = "wallet"
                                 send(chat_id, "📥 Alacağın coin için cüzdan adresini gir:")
@@ -189,7 +198,6 @@ def bot_loop():
                         elif step == "name":
                             s["name"] = text
                             create_order(chat_id, username)
-
                 if "callback_query" in u:
                     cb = u["callback_query"]
                     answer(cb["id"])
