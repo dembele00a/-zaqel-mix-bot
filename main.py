@@ -141,11 +141,12 @@ def bot_loop():
 
             for u in r.get("result", []):
                 OFFSET = u["update_id"] + 1
-if "message" in u:
-    msg = u["message"]
-    chat_id = msg["chat"]["id"]
-    text = msg.get("text", "")
-    username = msg.get("from", {}).get("username", "unknown")
+
+                if "message" in u:
+                    msg = u["message"]
+                    chat_id = msg["chat"]["id"]
+                    text = msg.get("text", "")
+                    username = msg.get("from", {}).get("username", "unknown")
     
     if text == "/start":
         menu(chat_id)
