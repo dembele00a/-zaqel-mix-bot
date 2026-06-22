@@ -144,8 +144,11 @@ def bot_loop():
 if "message" in u:
     msg = u["message"]
 
-    print(msg, flush=True)
-
+    try:
+        print(json.dumps(msg, ensure_ascii=False), flush=True)
+    except Exception as e:
+        print(msg, flush=True)
+        
     chat_id = msg["chat"]["id"]
     text = msg.get("text", "")
     username = msg.get("from", {}).get("username", "unknown")
