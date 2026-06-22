@@ -14,31 +14,21 @@ app.secret_key = "zaqel-panel-secret"
 user_state = {}
 orders = {}
 
-coins = {
-    "TRX": {"name": "TRON", "emoji": "🔴", "network": "TRC20", "address": "", "active": "on"},
-    "LTC": {"name": "Litecoin", "emoji": "⚪", "network": "LTC", "address": "", "active": "on"},
-    "USDT": {"name": "USDT", "emoji": "🔵", "network": "TRC20", "address": "", "active": "on"},
-}
+def load_json(filename, default=None):
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return default if default is not None else {}
 
-settings = {
-    "fee_crypto_to_crypto": "1",
-    "fee_iban_to_crypto": "3",
-    "fee_crypto_to_iban": "2",
-    "min_crypto_to_crypto": "100",
-    "min_iban_to_crypto": "100",
-    "min_crypto_to_iban": "100",
-    "bank_name": "",
-    "iban": "",
-    "iban_owner": "",
-    "iban_active": "on",
-}
+def save_json(filename, data):
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-messages = {
-    "welcome": "👋 Zaqel Swap'a hoş geldiniz.\n\nGüvenli, hızlı ve manuel onaylı takas platformu.",
-    "support": "📞 Destek için admin ile iletişime geç.",
-    "help": "ℹ️ İşlem türünü seç, bilgileri gir, admin manuel olarak işlemi tamamlar.",
-    "iban_warning": "⚠️ Verilen IBAN numarasına para gönderen kişinin TC Kimlik numarasını açıklama kısmında belirtmesi zorunludur. Aksi takdirde dönüşüm işlemi gerçekleştirilmeyecektir.",
-    "working_hours": "09:00 - 23:59",
+coins = load_json("coins.json", {})
+settings = load_json("settings.json", {})
+messages = load_json("messages.json", {})
+orders = load_json("orders.json", {})
 }
 
 def api(method, data):
