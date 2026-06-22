@@ -310,6 +310,11 @@ def admin():
                 coins[symbol]["address"] = request.form.get(f"address_{symbol}", coins[symbol]["address"])
                 coins[symbol]["active"] = request.form.get(f"active_{symbol}", "off")
 
+        save_json("settings.json", settings)
+        save_json("messages.json", messages)
+        save_json("coins.json", coins)
+        save_json("orders.json", orders)
+
         return redirect("/admin")
 
     coin_rows = ""
