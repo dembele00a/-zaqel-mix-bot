@@ -1,1 +1,37 @@
+{
+  "welcome": "👋 Zaqel Swap'a hoş geldiniz.\n\nGüvenli, hızlı ve manuel onaylı takas platformu.",
 
+  "swap_menu": "🔄 İşlem türünü seçiniz:",
+
+  "coin_select_crypto_to_crypto": "🔄 Takas etmek istediğiniz kripto para birimini seçiniz.",
+
+  "coin_select_iban_to_crypto": "🏦 Satın almak istediğiniz kripto para birimini seçiniz.",
+
+  "coin_select_crypto_to_iban": "💳 TL'ye çevirmek istediğiniz kripto para birimini seçiniz.",
+
+  "amount_question_crypto_to_crypto": "💰 Göndereceğiniz miktarı giriniz:",
+
+  "amount_question_iban_to_crypto": "💰 Göndereceğiniz TL miktarını giriniz:",
+
+  "amount_question_crypto_to_iban": "💰 Göndereceğiniz kripto miktarını giriniz:",
+
+  "wallet_question": "📥 Alıcı cüzdan adresini giriniz:",
+
+  "iban_question": "🏦 IBAN adresinizi giriniz:",
+
+  "name_question": "👤 Ad Soyad bilginizi giriniz:",
+
+  "support": "📞 Destek için admin ile iletişime geçiniz.",
+
+  "help": "ℹ️ İşlem türünü seçin ve bilgileri doldurun.",
+
+  "iban_warning": "⚠️ Verilen IBAN numarasına para gönderen kişinin TC Kimlik numarasını açıklama kısmında belirtmesi zorunludur. Aksi takdirde dönüşüm işlemi gerçekleştirilmeyecektir.",
+
+  "order_created": "✅ Siparişiniz oluşturuldu.",
+
+  "order_completed": "✅ Siparişiniz tamamlandı.",
+
+  "order_rejected": "❌ Siparişiniz reddedildi.",
+
+  "working_hours": "09:00 - 23:59"
+}
