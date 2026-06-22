@@ -40,6 +40,7 @@ coins = load_json("coins.json", {})
 settings = load_json("settings.json", {})
 messages = load_json("messages.json", {})
 orders = load_json("orders.json", {})
+referrals = load_json("referrals.json", {})
 
 
 MESSAGE_DEFAULTS = {
@@ -66,12 +67,17 @@ MESSAGE_DEFAULTS = {
     "fees_title": "💰 Komisyonlar:",
     "iban_closed": "❌ Şu anda IBAN ile ödeme kapalıdır.",
     "session_expired": "❌ İşlem süresi doldu. Lütfen tekrar başlayın.",
-    "working_hours": "09:00 - 23:59",
+    "working_hours": "7/24 Açık",
+    "min_amount_error": "❌ Minimum işlem tutarı: {min_amount}",
+    "referral_title": "👥 Referans Sistemi",
+    "referral_text": "Referans linkiniz:\n{ref_link}\n\nToplam davet: {count}\nReferans kodunuz: {code}",
+    "referral_registered": "✅ Referans kaydınız alındı.",
     "button_start_swap": "🔄 Swap Başlat",
     "button_my_orders": "📦 Siparişlerim",
     "button_fees": "💰 Komisyonlar",
     "button_help": "ℹ️ Nasıl Çalışır?",
     "button_support": "📞 Destek",
+    "button_referral": "👥 Referansım",
     "button_iban_to_crypto": "🏦 IBAN → Kripto",
     "button_crypto_to_iban": "💳 Kripto → IBAN",
     "button_crypto_to_crypto": "🔄 Kripto → Kripto",
@@ -91,6 +97,7 @@ ICON_DEFAULTS = {
     "icon_fees": "",
     "icon_help": "",
     "icon_support": "",
+    "icon_referral": "",
     "icon_iban_to_crypto": "",
     "icon_crypto_to_iban": "",
     "icon_crypto_to_crypto": "",
@@ -175,6 +182,7 @@ def menu(chat_id):
                 [telegram_button(messages.get("button_my_orders", MESSAGE_DEFAULTS["button_my_orders"]), "orders", "icon_my_orders")],
                 [telegram_button(messages.get("button_fees", MESSAGE_DEFAULTS["button_fees"]), "fees", "icon_fees")],
                 [telegram_button(messages.get("button_help", MESSAGE_DEFAULTS["button_help"]), "help", "icon_help")],
+                [telegram_button(messages.get("button_referral", MESSAGE_DEFAULTS["button_referral"]), "referral", "icon_referral")],
                 [telegram_button(messages.get("button_support", MESSAGE_DEFAULTS["button_support"]), "support", "icon_support")],
             ]
         },
@@ -222,6 +230,88 @@ def order_type_name(order_type):
     }.get(order_type, order_type or "Bilinmiyor")
 
 
+def parse_amount(value):
+    text = str(value or "").strip().replace(" ", "").replace(",", ".")
+    try:
+        amount = float(text)
+        if amount <= 0:
+            return None
+        return amount
+    except Exception:
+        return None
+
+
+def min_key_for_type(order_type):
+    return "min_" + str(order_type or "")
+
+
+def check_min_amount(order_type, amount_text):
+    amount = parse_amount(amount_text)
+    if amount is None:
+        return False, "❌ Lütfen geçerli bir miktar giriniz."
+
+    min_value = parse_amount(settings.get(min_key_for_type(order_type), "0"))
+    if min_value and amount < min_value:
+        msg = messages.get("min_amount_error", MESSAGE_DEFAULTS["min_amount_error"])
+        return False, msg.replace("{min_amount}", str(settings.get(min_key_for_type(order_type), min_value)))
+
+    return True, ""
+
+
+def bot_username():
+    cached = settings.get("bot_username", "").strip()
+    if cached:
+        return cached.lstrip("@")
+
+    result = api("getMe", {})
+    username = result.get("result", {}).get("username", "") if isinstance(result, dict) else ""
+    if username:
+        settings["bot_username"] = username
+        save_json("settings.json", settings)
+    return username
+
+
+def referral_code(chat_id):
+    return str(chat_id)
+
+
+def register_referral(new_chat_id, ref_code):
+    new_chat_id = str(new_chat_id)
+    ref_code = str(ref_code or "").replace("ref_", "").strip()
+
+    if not ref_code or ref_code == new_chat_id:
+        return False
+
+    with data_lock:
+        profile = referrals.setdefault(new_chat_id, {})
+        if profile.get("referrer_id"):
+            return False
+
+        profile["referrer_id"] = ref_code
+        profile["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        owner = referrals.setdefault(ref_code, {})
+        invited = owner.setdefault("invited", [])
+        if new_chat_id not in invited:
+            invited.append(new_chat_id)
+
+        save_json("referrals.json", referrals)
+
+    return True
+
+
+def referral_info(chat_id):
+    chat_id = str(chat_id)
+    code = referral_code(chat_id)
+    username = bot_username()
+    ref_link = f"https://t.me/{username}?start=ref_{code}" if username else f"/start ref_{code}"
+    count = len(referrals.get(chat_id, {}).get("invited", []))
+
+    text = messages.get("referral_text", MESSAGE_DEFAULTS["referral_text"])
+    text = text.replace("{ref_link}", ref_link).replace("{count}", str(count)).replace("{code}", code)
+    return messages.get("referral_title", MESSAGE_DEFAULTS["referral_title"]) + "\n\n" + text
+
+
 def create_order(chat_id, username):
     s = user_state.get(chat_id)
     if not s:
@@ -235,6 +325,7 @@ def create_order(chat_id, username):
         orders[oid] = {
             "chat_id": chat_id,
             "username": username,
+            "referrer_id": referrals.get(str(chat_id), {}).get("referrer_id", ""),
             **s,
             "status": "⏳ Bekliyor",
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -385,11 +476,18 @@ def bot_loop():
                         )
                         continue
 
-                    if text == "/start":
+                    if text.startswith("/start"):
+                        parts = text.split(maxsplit=1)
+                        if len(parts) == 2 and parts[1].startswith("ref_"):
+                            if register_referral(chat_id, parts[1]):
+                                send(chat_id, messages.get("referral_registered", MESSAGE_DEFAULTS["referral_registered"]))
                         menu(chat_id)
 
                     elif text == "/siparislerim":
                         my_orders(chat_id)
+
+                    elif text in ["/referans", "/ref"]:
+                        send(chat_id, referral_info(chat_id))
 
                     elif text.startswith("/tamamla") and str(chat_id) == str(ADMIN_CHAT_ID):
                         parts = text.split()
@@ -404,6 +502,11 @@ def bot_loop():
                         step = s.get("step")
 
                         if step == "amount":
+                            ok_min, min_error = check_min_amount(s.get("type"), text)
+                            if not ok_min:
+                                send(chat_id, min_error)
+                                continue
+
                             s["amount"] = text
 
                             if s["type"] in ["crypto_to_crypto", "iban_to_crypto"]:
@@ -479,6 +582,9 @@ def bot_loop():
 
                     elif data == "support":
                         send(chat_id, messages.get("support", "📞 Destek"))
+
+                    elif data == "referral":
+                        send(chat_id, referral_info(chat_id))
 
                     elif data == "type_crypto_to_crypto":
                         user_state[chat_id] = {"type": "crypto_to_crypto"}
@@ -732,6 +838,7 @@ def render_order_cards(view="active"):
             ("Sipariş No", f"#{oid}"),
             ("Kullanıcı", f"@{order.get('username', 'unknown')}"),
             ("Telegram ID", order.get("chat_id", "")),
+            ("Referans Veren", order.get("referrer_id", "-") or "-"),
             ("Tür", order_type_name(order.get("type"))),
             ("Miktar", order.get("amount", "")),
             ("Gönderilen Coin", order.get("from_coin", "-")),
@@ -952,6 +1059,7 @@ def admin():
         save_json("messages.json", messages)
         save_json("coins.json", coins)
         save_json("orders.json", orders)
+        save_json("referrals.json", referrals)
 
         return_view = request.form.get("return_view", "active")
 
@@ -1010,7 +1118,11 @@ def admin():
         ("help", "Nasıl çalışır mesajı"),
         ("support", "Destek mesajı"),
         ("iban_warning", "IBAN uyarı mesajı"),
-        ("working_hours", "Çalışma saatleri"),
+        ("working_hours", "Çalışma saatleri / durum metni"),
+        ("min_amount_error", "Minimum miktar hata mesajı"),
+        ("referral_title", "Referans başlığı"),
+        ("referral_text", "Referans mesajı"),
+        ("referral_registered", "Referans kayıt mesajı"),
     ]
 
     button_fields = [
@@ -1018,6 +1130,7 @@ def admin():
         ("button_my_orders", "Ana menü: Siparişlerim"),
         ("button_fees", "Ana menü: Komisyonlar"),
         ("button_help", "Ana menü: Nasıl Çalışır?"),
+        ("button_referral", "Ana menü: Referansım"),
         ("button_support", "Ana menü: Destek"),
         ("button_iban_to_crypto", "İşlem türü: IBAN → Kripto"),
         ("button_crypto_to_iban", "İşlem türü: Kripto → IBAN"),
@@ -1031,6 +1144,7 @@ def admin():
         ("icon_my_orders", "Siparişlerim custom emoji ID"),
         ("icon_fees", "Komisyonlar custom emoji ID"),
         ("icon_help", "Nasıl Çalışır custom emoji ID"),
+        ("icon_referral", "Referansım custom emoji ID"),
         ("icon_support", "Destek custom emoji ID"),
         ("icon_iban_to_crypto", "IBAN → Kripto custom emoji ID"),
         ("icon_crypto_to_iban", "Kripto → IBAN custom emoji ID"),
@@ -1687,6 +1801,21 @@ def admin():
                     💾 Tüm Mesaj, Buton ve Ayarları Kaydet
                 </button>
             </form>
+
+
+            <details class="box">
+                <summary>👥 Referans Sistemi</summary>
+                <div class="collapsible-content">
+                <div class="section-note">
+                    Kullanıcılar kendi referans linkini /referans komutu veya Referansım butonu ile alır.
+                    Linkle gelen kullanıcı ilk /start sırasında referans verene bağlanır. Sistem 7/24 sipariş almaya devam eder.
+                </div>
+                <div class="details">
+                    <div class="detail"><span>Toplam referans profili</span><strong>{len(referrals)}</strong></div>
+                    <div class="detail"><span>Toplam davet kaydı</span><strong>{sum(len(v.get('invited', [])) for v in referrals.values() if isinstance(v, dict))}</strong></div>
+                </div>
+                </div>
+            </details>
 
             <details class="box">
                 <summary>🪙 Coin Yönetimi</summary>
