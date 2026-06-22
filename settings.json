@@ -1,1 +1,18 @@
-{}
+{
+  "fee_crypto_to_crypto": "1",
+  "fee_iban_to_crypto": "3",
+  "fee_crypto_to_iban": "2",
+
+  "min_crypto_to_crypto": "100",
+  "min_iban_to_crypto": "100",
+  "min_crypto_to_iban": "100",
+
+  "bank_name": "",
+  "iban": "",
+  "iban_owner": "",
+
+  "iban_active": "on",
+
+  "support_username": "",
+  "working_hours": "09:00 - 23:59"
+}
