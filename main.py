@@ -1137,13 +1137,31 @@ def admin():
                 border: 1px solid var(--border);
                 border-radius: 20px;
                 background: var(--panel);
-                backdrop-filter: blur(16px);
-                box-shadow: var(--shadow);
+                box-shadow: 0 10px 28px rgba(0, 0, 0, .20);
             }}
 
             details.box {{
                 padding: 0;
                 overflow: hidden;
+                content-visibility: auto;
+                contain-intrinsic-size: 72px 520px;
+            }}
+
+            .order-card {{
+                content-visibility: auto;
+                contain-intrinsic-size: 360px;
+            }}
+
+            .table-wrap {{
+                contain: layout paint;
+            }}
+
+            @media (prefers-reduced-motion: reduce) {{
+                * {{
+                    scroll-behavior: auto !important;
+                    transition: none !important;
+                    animation: none !important;
+                }}
             }}
 
             details.box > summary {{
@@ -1466,6 +1484,16 @@ def admin():
                 }}
             }}
 
+            @media (hover: none) {{
+                .order-card:hover {{
+                    transform: none;
+                }}
+
+                button:hover {{
+                    transform: none;
+                }}
+            }}
+
             @media (max-width: 680px) {{
                 .container {{
                     width: min(100% - 16px, 1380px);
@@ -1731,16 +1759,28 @@ def admin():
         </main>
 
         <script>
-            async function refreshOrders() {{
-                const activeElement = document.activeElement;
+            let lastOrderHtml = "";
+            let refreshInProgress = false;
 
+            function userIsEditing() {{
+                const active = document.activeElement;
+
+                if (!active) {{
+                    return false;
+                }}
+
+                return (
+                    active.tagName === "INPUT" ||
+                    active.tagName === "TEXTAREA" ||
+                    active.tagName === "SELECT"
+                );
+            }}
+
+            async function refreshOrders() {{
                 if (
-                    activeElement &&
-                    activeElement.classList &&
-                    (
-                        activeElement.classList.contains("reject-reason") ||
-                        activeElement.classList.contains("approval-reason")
-                    )
+                    document.hidden ||
+                    userIsEditing() ||
+                    refreshInProgress
                 ) {{
                     return;
                 }}
@@ -1752,22 +1792,61 @@ def admin():
                 }}
 
                 const view = grid.dataset.view || "active";
+                refreshInProgress = true;
 
                 try {{
                     const response = await fetch(
                         "/admin/orders-fragment?view=" + encodeURIComponent(view),
-                        {{ cache: "no-store" }}
+                        {{
+                            cache: "no-store",
+                            headers: {{
+                                "X-Requested-With": "fetch"
+                            }}
+                        }}
                     );
 
                     if (!response.ok) {{
                         return;
                     }}
 
-                    grid.innerHTML = await response.text();
+                    const html = await response.text();
+
+                    if (html !== lastOrderHtml && html !== grid.innerHTML) {{
+                        grid.innerHTML = html;
+                        lastOrderHtml = html;
+                    }}
                 }} catch (error) {{
                     console.log("Sipariş yenileme hatası:", error);
+                }} finally {{
+                    refreshInProgress = false;
                 }}
             }}
+
+            document.addEventListener("visibilitychange", () => {{
+                if (!document.hidden) {{
+                    refreshOrders();
+                }}
+            }});
+
+            document.querySelectorAll("details.box").forEach((details) => {{
+                details.addEventListener("toggle", () => {{
+                    if (!details.open) {{
+                        return;
+                    }}
+
+                    const parent = details.parentElement;
+
+                    if (!parent) {{
+                        return;
+                    }}
+
+                    parent.querySelectorAll(":scope > details.box[open]").forEach((other) => {{
+                        if (other !== details) {{
+                            other.open = false;
+                        }}
+                    }});
+                }});
+            }});
 
             setInterval(refreshOrders, 8000);
         </script>
