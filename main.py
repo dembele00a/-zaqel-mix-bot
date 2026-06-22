@@ -40,7 +40,6 @@ coins = load_json("coins.json", {})
 settings = load_json("settings.json", {})
 messages = load_json("messages.json", {})
 orders = load_json("orders.json", {})
-referrals = load_json("referrals.json", {})
 
 
 MESSAGE_DEFAULTS = {
@@ -67,17 +66,12 @@ MESSAGE_DEFAULTS = {
     "fees_title": "💰 Komisyonlar:",
     "iban_closed": "❌ Şu anda IBAN ile ödeme kapalıdır.",
     "session_expired": "❌ İşlem süresi doldu. Lütfen tekrar başlayın.",
-    "working_hours": "7/24 Açık",
-    "min_amount_error": "❌ Minimum işlem tutarı: {min_amount}",
-    "referral_title": "👥 Referans Sistemi",
-    "referral_text": "Referans linkiniz:\n{ref_link}\n\nToplam davet: {count}\nReferans kodunuz: {code}",
-    "referral_registered": "✅ Referans kaydınız alındı.",
+    "working_hours": "09:00 - 23:59",
     "button_start_swap": "🔄 Swap Başlat",
     "button_my_orders": "📦 Siparişlerim",
     "button_fees": "💰 Komisyonlar",
     "button_help": "ℹ️ Nasıl Çalışır?",
     "button_support": "📞 Destek",
-    "button_referral": "👥 Referansım",
     "button_iban_to_crypto": "🏦 IBAN → Kripto",
     "button_crypto_to_iban": "💳 Kripto → IBAN",
     "button_crypto_to_crypto": "🔄 Kripto → Kripto",
@@ -92,23 +86,40 @@ save_json("messages.json", messages)
 
 
 ICON_DEFAULTS = {
-    "icon_start_swap": "",
-    "icon_my_orders": "",
-    "icon_fees": "",
-    "icon_help": "",
-    "icon_support": "",
-    "icon_referral": "",
-    "icon_iban_to_crypto": "",
-    "icon_crypto_to_iban": "",
-    "icon_crypto_to_crypto": "",
+    "icon_start_swap": "5893252234614939371",
+    "icon_my_orders": "5895533287450877887",
+    "icon_fees": "5895334439055009075",
+    "icon_help": "5895656948149263789",
+    "icon_support": "5895698390288703053",
+    "icon_iban_to_crypto": "5895549153060069171",
+    "icon_crypto_to_iban": "5895506164732403256",
+    "icon_crypto_to_crypto": "5895671971944866108",
     "icon_main_menu": "",
     "icon_back": "",
+    "icon_pending": "5895304795190730655",
+    "icon_processing": "5895589615946964496",
+    "icon_security": "5895439304976506343",
+    "icon_rejected": "5895319286410387652",
+    "icon_completed": "5893391786692323248",
 }
 
 for key, default_value in ICON_DEFAULTS.items():
-    messages.setdefault(key, default_value)
+    if not str(messages.get(key, "")).strip():
+        messages[key] = default_value
 
 save_json("messages.json", messages)
+
+COIN_CUSTOM_EMOJI_DEFAULTS = {
+    "TRX": "5895440778150288520",
+    "LTC": "5895441495409828662",
+    "USDT": "5895571353746021767",
+}
+
+for symbol, custom_emoji_id in COIN_CUSTOM_EMOJI_DEFAULTS.items():
+    if symbol in coins and not str(coins[symbol].get("custom_emoji_id", "")).strip():
+        coins[symbol]["custom_emoji_id"] = custom_emoji_id
+
+save_json("coins.json", coins)
 
 
 def telegram_button(text, callback_data, icon_key=None):
@@ -182,7 +193,6 @@ def menu(chat_id):
                 [telegram_button(messages.get("button_my_orders", MESSAGE_DEFAULTS["button_my_orders"]), "orders", "icon_my_orders")],
                 [telegram_button(messages.get("button_fees", MESSAGE_DEFAULTS["button_fees"]), "fees", "icon_fees")],
                 [telegram_button(messages.get("button_help", MESSAGE_DEFAULTS["button_help"]), "help", "icon_help")],
-                [telegram_button(messages.get("button_referral", MESSAGE_DEFAULTS["button_referral"]), "referral", "icon_referral")],
                 [telegram_button(messages.get("button_support", MESSAGE_DEFAULTS["button_support"]), "support", "icon_support")],
             ]
         },
@@ -230,88 +240,6 @@ def order_type_name(order_type):
     }.get(order_type, order_type or "Bilinmiyor")
 
 
-def parse_amount(value):
-    text = str(value or "").strip().replace(" ", "").replace(",", ".")
-    try:
-        amount = float(text)
-        if amount <= 0:
-            return None
-        return amount
-    except Exception:
-        return None
-
-
-def min_key_for_type(order_type):
-    return "min_" + str(order_type or "")
-
-
-def check_min_amount(order_type, amount_text):
-    amount = parse_amount(amount_text)
-    if amount is None:
-        return False, "❌ Lütfen geçerli bir miktar giriniz."
-
-    min_value = parse_amount(settings.get(min_key_for_type(order_type), "0"))
-    if min_value and amount < min_value:
-        msg = messages.get("min_amount_error", MESSAGE_DEFAULTS["min_amount_error"])
-        return False, msg.replace("{min_amount}", str(settings.get(min_key_for_type(order_type), min_value)))
-
-    return True, ""
-
-
-def bot_username():
-    cached = settings.get("bot_username", "").strip()
-    if cached:
-        return cached.lstrip("@")
-
-    result = api("getMe", {})
-    username = result.get("result", {}).get("username", "") if isinstance(result, dict) else ""
-    if username:
-        settings["bot_username"] = username
-        save_json("settings.json", settings)
-    return username
-
-
-def referral_code(chat_id):
-    return str(chat_id)
-
-
-def register_referral(new_chat_id, ref_code):
-    new_chat_id = str(new_chat_id)
-    ref_code = str(ref_code or "").replace("ref_", "").strip()
-
-    if not ref_code or ref_code == new_chat_id:
-        return False
-
-    with data_lock:
-        profile = referrals.setdefault(new_chat_id, {})
-        if profile.get("referrer_id"):
-            return False
-
-        profile["referrer_id"] = ref_code
-        profile["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        owner = referrals.setdefault(ref_code, {})
-        invited = owner.setdefault("invited", [])
-        if new_chat_id not in invited:
-            invited.append(new_chat_id)
-
-        save_json("referrals.json", referrals)
-
-    return True
-
-
-def referral_info(chat_id):
-    chat_id = str(chat_id)
-    code = referral_code(chat_id)
-    username = bot_username()
-    ref_link = f"https://t.me/{username}?start=ref_{code}" if username else f"/start ref_{code}"
-    count = len(referrals.get(chat_id, {}).get("invited", []))
-
-    text = messages.get("referral_text", MESSAGE_DEFAULTS["referral_text"])
-    text = text.replace("{ref_link}", ref_link).replace("{count}", str(count)).replace("{code}", code)
-    return messages.get("referral_title", MESSAGE_DEFAULTS["referral_title"]) + "\n\n" + text
-
-
 def create_order(chat_id, username):
     s = user_state.get(chat_id)
     if not s:
@@ -325,7 +253,6 @@ def create_order(chat_id, username):
         orders[oid] = {
             "chat_id": chat_id,
             "username": username,
-            "referrer_id": referrals.get(str(chat_id), {}).get("referrer_id", ""),
             **s,
             "status": "⏳ Bekliyor",
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -472,22 +399,15 @@ def bot_loop():
                     if custom_emoji_ids and str(chat_id) == str(ADMIN_CHAT_ID):
                         send(
                             chat_id,
-                            "🧩 Custom Emoji ID:\n\n" + "\n".join(custom_emoji_ids)
+                            "\n".join(custom_emoji_ids)
                         )
                         continue
 
-                    if text.startswith("/start"):
-                        parts = text.split(maxsplit=1)
-                        if len(parts) == 2 and parts[1].startswith("ref_"):
-                            if register_referral(chat_id, parts[1]):
-                                send(chat_id, messages.get("referral_registered", MESSAGE_DEFAULTS["referral_registered"]))
+                    if text == "/start":
                         menu(chat_id)
 
                     elif text == "/siparislerim":
                         my_orders(chat_id)
-
-                    elif text in ["/referans", "/ref"]:
-                        send(chat_id, referral_info(chat_id))
 
                     elif text.startswith("/tamamla") and str(chat_id) == str(ADMIN_CHAT_ID):
                         parts = text.split()
@@ -502,11 +422,6 @@ def bot_loop():
                         step = s.get("step")
 
                         if step == "amount":
-                            ok_min, min_error = check_min_amount(s.get("type"), text)
-                            if not ok_min:
-                                send(chat_id, min_error)
-                                continue
-
                             s["amount"] = text
 
                             if s["type"] in ["crypto_to_crypto", "iban_to_crypto"]:
@@ -565,4 +480,67 @@ def bot_loop():
                     elif data == "fees":
                         send(
                             chat_id,
-                        
+                            (
+                                messages.get("fees_title", MESSAGE_DEFAULTS["fees_title"]) + "\n\n"
+                                f"🔄 Kripto → Kripto: %{settings.get('fee_crypto_to_crypto', '0')}\n"
+                                f"🏦 IBAN → Kripto: %{settings.get('fee_iban_to_crypto', '0')}\n"
+                                f"💳 Kripto → IBAN: %{settings.get('fee_crypto_to_iban', '0')}"
+                            ),
+                        )
+
+                    elif data == "help":
+                        send(
+                            chat_id,
+                            messages.get("help", "ℹ️ İşlem türünü seçin.")
+                            + f"\n\nÇalışma saatleri: {messages.get('working_hours', '')}",
+                        )
+
+                    elif data == "support":
+                        send(chat_id, messages.get("support", "📞 Destek"))
+
+                    elif data == "type_crypto_to_crypto":
+                        user_state[chat_id] = {"type": "crypto_to_crypto"}
+                        coin_menu(
+                            chat_id,
+                            "from",
+                            message_text=messages.get(
+                                "coin_select_crypto_to_crypto",
+                                "🔄 Takas etmek istediğiniz kripto para birimini seçiniz."
+                            ),
+                        )
+
+                    elif data == "type_iban_to_crypto":
+                        if settings.get("iban_active") != "on":
+                            send(chat_id, messages.get("iban_closed", MESSAGE_DEFAULTS["iban_closed"]))
+                        else:
+                            user_state[chat_id] = {"type": "iban_to_crypto"}
+                            coin_menu(
+                                chat_id,
+                                "to",
+                                message_text=messages.get(
+                                    "coin_select_iban_to_crypto",
+                                    "🏦 Satın almak istediğiniz kripto para birimini seçiniz."
+                                ),
+                            )
+
+                    elif data == "type_crypto_to_iban":
+                        user_state[chat_id] = {"type": "crypto_to_iban"}
+                        coin_menu(
+                            chat_id,
+                            "from",
+                            message_text=messages.get(
+                                "coin_select_crypto_to_iban",
+                                "💳 TL'ye çevirmek istediğiniz kripto para birimini seçiniz."
+                            ),
+                        )
+
+                    elif data.startswith("from_"):
+                        coin = data.replace("from_", "")
+                        s = user_state.get(chat_id)
+                        if not s:
+                            send(chat_id, messages.get("session_expired", MESSAGE_DEFAULTS["session_expired"]))
+                            continue
+
+                        s["from_coin"] = coin
+
+                        if
