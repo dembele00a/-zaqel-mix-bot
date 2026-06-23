@@ -40,7 +40,28 @@ coins = load_json("coins.json", {})
 settings = load_json("settings.json", {})
 messages = load_json("messages.json", {})
 orders = load_json("orders.json", {})
-referrals = load_json("referrals.json", {})
+
+
+SETTINGS_DEFAULTS = {
+    "price_TRX": "15.50",
+    "price_LTC": "2065",
+    "price_USDT": "46.40",
+    "fee_crypto_to_crypto": "0",
+    "fee_iban_to_crypto": "0",
+    "fee_crypto_to_iban": "0",
+    "min_crypto_to_crypto": "0",
+    "min_iban_to_crypto": "0",
+    "min_crypto_to_iban": "0",
+    "bank_name": "",
+    "iban": "",
+    "iban_owner": "",
+    "iban_active": "on",
+}
+
+for key, default_value in SETTINGS_DEFAULTS.items():
+    settings.setdefault(key, default_value)
+
+save_json("settings.json", settings)
 
 
 MESSAGE_DEFAULTS = {
@@ -67,17 +88,12 @@ MESSAGE_DEFAULTS = {
     "fees_title": "💰 Komisyonlar:",
     "iban_closed": "❌ Şu anda IBAN ile ödeme kapalıdır.",
     "session_expired": "❌ İşlem süresi doldu. Lütfen tekrar başlayın.",
-    "working_hours": "7/24 Açık",
-    "min_amount_error": "❌ Minimum işlem tutarı: {min_amount}",
-    "referral_title": "👥 Referans Sistemi",
-    "referral_text": "Referans linkiniz:\n{ref_link}\n\nToplam davet: {count}\nReferans kodunuz: {code}",
-    "referral_registered": "✅ Referans kaydınız alındı.",
+    "working_hours": "09:00 - 23:59",
     "button_start_swap": "🔄 Swap Başlat",
     "button_my_orders": "📦 Siparişlerim",
     "button_fees": "💰 Komisyonlar",
     "button_help": "ℹ️ Nasıl Çalışır?",
     "button_support": "📞 Destek",
-    "button_referral": "👥 Referansım",
     "button_iban_to_crypto": "🏦 IBAN → Kripto",
     "button_crypto_to_iban": "💳 Kripto → IBAN",
     "button_crypto_to_crypto": "🔄 Kripto → Kripto",
@@ -92,23 +108,39 @@ save_json("messages.json", messages)
 
 
 ICON_DEFAULTS = {
-    "icon_start_swap": "",
-    "icon_my_orders": "",
-    "icon_fees": "",
-    "icon_help": "",
-    "icon_support": "",
-    "icon_referral": "",
-    "icon_iban_to_crypto": "",
-    "icon_crypto_to_iban": "",
-    "icon_crypto_to_crypto": "",
+    "icon_start_swap": "5893252234614939371",
+    "icon_my_orders": "5895533287450877887",
+    "icon_fees": "5895334439055009075",
+    "icon_help": "5895656948149263789",
+    "icon_support": "5895698390288703053",
+    "icon_iban_to_crypto": "5895549153060069171",
+    "icon_crypto_to_iban": "5895506164732403256",
+    "icon_crypto_to_crypto": "5895671971944866108",
     "icon_main_menu": "",
     "icon_back": "",
+    "icon_pending": "5895304795190730655",
+    "icon_processing": "5895589615946964496",
+    "icon_security": "5895439304976506343",
+    "icon_rejected": "5895319286410387652",
+    "icon_completed": "5893391786692323248",
 }
-
 for key, default_value in ICON_DEFAULTS.items():
-    messages.setdefault(key, default_value)
+    if not str(messages.get(key, "")).strip():
+        messages[key] = default_value
 
 save_json("messages.json", messages)
+
+COIN_CUSTOM_EMOJI_DEFAULTS = {
+    "TRX": "5895440778150288520",
+    "LTC": "5895441495409828662",
+    "USDT": "5895571353746021767",
+}
+
+for symbol, custom_emoji_id in COIN_CUSTOM_EMOJI_DEFAULTS.items():
+    if symbol in coins and not str(coins[symbol].get("custom_emoji_id", "")).strip():
+        coins[symbol]["custom_emoji_id"] = custom_emoji_id
+
+save_json("coins.json", coins)
 
 
 def telegram_button(text, callback_data, icon_key=None):
@@ -182,7 +214,6 @@ def menu(chat_id):
                 [telegram_button(messages.get("button_my_orders", MESSAGE_DEFAULTS["button_my_orders"]), "orders", "icon_my_orders")],
                 [telegram_button(messages.get("button_fees", MESSAGE_DEFAULTS["button_fees"]), "fees", "icon_fees")],
                 [telegram_button(messages.get("button_help", MESSAGE_DEFAULTS["button_help"]), "help", "icon_help")],
-                [telegram_button(messages.get("button_referral", MESSAGE_DEFAULTS["button_referral"]), "referral", "icon_referral")],
                 [telegram_button(messages.get("button_support", MESSAGE_DEFAULTS["button_support"]), "support", "icon_support")],
             ]
         },
@@ -222,94 +253,280 @@ def coin_menu(chat_id, prefix, exclude=None, message_text="Coin seçiniz:"):
     send(chat_id, message_text, {"inline_keyboard": rows})
 
 
+
+def normalize_amount(value):
+    value = str(value).strip().replace(" ", "").replace(",", ".")
+    return float(value)
+
+
+def money(value):
+    try:
+        return f"{float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return str(value)
+
+
+def coin_amount(value):
+    try:
+        formatted = f"{float(value):.8f}".rstrip("0").rstrip(".")
+        return formatted if formatted else "0"
+    except Exception:
+        return str(value)
+
+
+def get_fee_percent(order_type):
+    try:
+        return float(str(settings.get("fee_" + str(order_type), "0")).replace(",", ".") or 0)
+    except Exception:
+        return 0.0
+
+
+def get_min_amount(order_type):
+    try:
+        return float(str(settings.get("min_" + str(order_type), "0")).replace(",", ".") or 0)
+    except Exception:
+        return 0.0
+
+
+def get_coin_price(symbol):
+    try:
+        return float(str(settings.get("price_" + str(symbol).upper(), "0")).replace(",", ".") or 0)
+    except Exception:
+        return 0.0
+
+
+def coin_address(symbol):
+    return str(coins.get(symbol, {}).get("address", "")).strip()
+
+
+def payment_sent_keyboard():
+    return {
+        "inline_keyboard": [
+            [telegram_button("✅ Gönderdim", "payment_sent", "icon_completed")],
+            [telegram_button(messages.get("button_main_menu", MESSAGE_DEFAULTS["button_main_menu"]), "main", "icon_main_menu")],
+        ]
+    }
+
+
+def order_detail_text(oid, order):
+    order_type = order.get("type", "")
+    lines = [
+        "📄 Sipariş Detayı",
+        "",
+        f"No: #{oid}",
+        f"Durum: {order.get('status', 'Bilinmiyor')}",
+        f"Tür: {order_type_name(order_type)}",
+    ]
+
+    if order_type == "iban_to_crypto":
+        lines += [
+            "",
+            f"Ödenen TL: {money(order.get('amount_tl', order.get('amount', '')))} TL",
+            f"Komisyon: %{order.get('fee_percent', get_fee_percent(order_type))}",
+            f"Net TL: {money(order.get('net_tl', ''))} TL",
+            f"Alınacak Coin: {coin_amount(order.get('receive_amount', ''))} {order.get('to_coin', '')}",
+            f"Coin Fiyatı: {money(order.get('to_price', ''))} TL",
+            f"Gönderen Ad Soyad: {order.get('payer_name', '-')}",
+            f"Alıcı Cüzdan: {order.get('wallet', '-')}",
+        ]
+    elif order_type == "crypto_to_iban":
+        lines += [
+            "",
+            f"Gönderilen: {coin_amount(order.get('amount_coin', order.get('amount', '')))} {order.get('from_coin', '')}",
+            f"Coin Fiyatı: {money(order.get('from_price', ''))} TL",
+            f"Toplam TL: {money(order.get('gross_tl', ''))} TL",
+            f"Komisyon: %{order.get('fee_percent', get_fee_percent(order_type))}",
+            f"Ödenecek Net TL: {money(order.get('net_tl', ''))} TL",
+            f"Alıcı Ad Soyad: {order.get('name', '-')}",
+            f"Banka: {order.get('bank_name_user', '-')}",
+            f"IBAN: {order.get('iban', '-')}",
+        ]
+    elif order_type == "crypto_to_crypto":
+        lines += [
+            "",
+            f"Gönderilen: {coin_amount(order.get('amount_coin', order.get('amount', '')))} {order.get('from_coin', '')}",
+            f"Gönderilen TL Değeri: {money(order.get('gross_tl', ''))} TL",
+            f"Komisyon: %{order.get('fee_percent', get_fee_percent(order_type))}",
+            f"Net TL: {money(order.get('net_tl', ''))} TL",
+            f"Alınacak: {coin_amount(order.get('receive_amount', ''))} {order.get('to_coin', '')}",
+            f"Alınacak Coin Fiyatı: {money(order.get('to_price', ''))} TL",
+            f"Alıcı Cüzdan: {order.get('wallet', '-')}",
+        ]
+    else:
+        lines += [
+            "",
+            f"Miktar: {order.get('amount', '-')}",
+            f"Gönderilen Coin: {order.get('from_coin', '-')}",
+            f"Alınacak Coin: {order.get('to_coin', '-')}",
+            f"Cüzdan: {order.get('wallet', '-')}",
+            f"IBAN: {order.get('iban', '-')}",
+            f"Ad Soyad: {order.get('name', '-')}",
+        ]
+
+    lines += ["", f"Oluşturulma: {order.get('created_at', '-')}"]
+
+    if order.get("completed_at"):
+        lines.append(f"Tamamlanma: {order.get('completed_at')}")
+    if order.get("approval_reason"):
+        lines.append(f"Onay Notu: {order.get('approval_reason')}")
+    if order.get("rejected_at"):
+        lines.append(f"Reddedilme: {order.get('rejected_at')}")
+    if order.get("reject_reason"):
+        lines.append(f"Red Sebebi: {order.get('reject_reason')}")
+
+    return "\n".join(str(x) for x in lines)
+
+
+def calculate_iban_to_crypto(state, amount_text):
+    amount_tl = normalize_amount(amount_text)
+    order_type = "iban_to_crypto"
+    min_amount = get_min_amount(order_type)
+    if min_amount and amount_tl < min_amount:
+        return False, f"❌ Minimum işlem tutarı {money(min_amount)} TL'dir.", None
+
+    to_coin = state.get("to_coin", "")
+    to_price = get_coin_price(to_coin)
+    if to_price <= 0:
+        return False, f"❌ {to_coin} fiyatı panelde girilmemiş.", None
+
+    fee_percent = get_fee_percent(order_type)
+    fee_tl = amount_tl * fee_percent / 100
+    net_tl = amount_tl - fee_tl
+    receive_amount = net_tl / to_price
+
+    return True, "", {
+        "amount": str(amount_tl),
+        "amount_tl": amount_tl,
+        "fee_percent": fee_percent,
+        "fee_tl": fee_tl,
+        "net_tl": net_tl,
+        "to_price": to_price,
+        "receive_amount": receive_amount,
+    }
+
+
+def calculate_crypto_to_iban(state, amount_text):
+    amount_coin = normalize_amount(amount_text)
+    order_type = "crypto_to_iban"
+    from_coin = state.get("from_coin", "")
+    from_price = get_coin_price(from_coin)
+    if from_price <= 0:
+        return False, f"❌ {from_coin} fiyatı panelde girilmemiş.", None
+
+    gross_tl = amount_coin * from_price
+    min_amount = get_min_amount(order_type)
+    if min_amount and gross_tl < min_amount:
+        return False, f"❌ Minimum işlem tutarı {money(min_amount)} TL'dir.", None
+
+    fee_percent = get_fee_percent(order_type)
+    fee_tl = gross_tl * fee_percent / 100
+    net_tl = gross_tl - fee_tl
+
+    return True, "", {
+        "amount": str(amount_coin),
+        "amount_coin": amount_coin,
+        "from_price": from_price,
+        "gross_tl": gross_tl,
+        "fee_percent": fee_percent,
+        "fee_tl": fee_tl,
+        "net_tl": net_tl,
+    }
+
+
+def calculate_crypto_to_crypto(state, amount_text):
+    amount_coin = normalize_amount(amount_text)
+    order_type = "crypto_to_crypto"
+    from_coin = state.get("from_coin", "")
+    to_coin = state.get("to_coin", "")
+    from_price = get_coin_price(from_coin)
+    to_price = get_coin_price(to_coin)
+
+    if from_price <= 0:
+        return False, f"❌ {from_coin} fiyatı panelde girilmemiş.", None
+    if to_price <= 0:
+        return False, f"❌ {to_coin} fiyatı panelde girilmemiş.", None
+
+    gross_tl = amount_coin * from_price
+    min_amount = get_min_amount(order_type)
+    if min_amount and gross_tl < min_amount:
+        return False, f"❌ Minimum işlem tutarı {money(min_amount)} TL'dir.", None
+
+    fee_percent = get_fee_percent(order_type)
+    fee_tl = gross_tl * fee_percent / 100
+    net_tl = gross_tl - fee_tl
+    receive_amount = net_tl / to_price
+
+    return True, "", {
+        "amount": str(amount_coin),
+        "amount_coin": amount_coin,
+        "from_price": from_price,
+        "to_price": to_price,
+        "gross_tl": gross_tl,
+        "fee_percent": fee_percent,
+        "fee_tl": fee_tl,
+        "net_tl": net_tl,
+        "receive_amount": receive_amount,
+    }
+
+
+def send_iban_payment_info(chat_id, state):
+    send(
+        chat_id,
+        (
+            "📄 İşlem Özeti\n\n"
+            f"Ödenecek TL: {money(state.get('amount_tl', 0))} TL\n"
+            f"Komisyon: %{state.get('fee_percent', 0)}\n"
+            f"Net TL: {money(state.get('net_tl', 0))} TL\n"
+            f"Alacağınız: {coin_amount(state.get('receive_amount', 0))} {state.get('to_coin', '')}\n"
+            f"Coin Fiyatı: {money(state.get('to_price', 0))} TL"
+        ),
+    )
+    send(chat_id, f"Banka Adı:\n{settings.get('bank_name', '')}")
+    send(chat_id, f"IBAN:\n{settings.get('iban', '')}")
+    send(chat_id, f"Alıcı Ad Soyad:\n{settings.get('iban_owner', '')}")
+    send(
+        chat_id,
+        messages.get("iban_warning", MESSAGE_DEFAULTS["iban_warning"])
+        + "\n\nÖdemeyi yaptıktan sonra aşağıdaki butona basın.",
+        payment_sent_keyboard(),
+    )
+
+
+def send_crypto_payment_info(chat_id, state):
+    order_type = state.get("type")
+    from_coin = state.get("from_coin", "")
+    address = coin_address(from_coin)
+
+    if order_type == "crypto_to_iban":
+        text = (
+            "📄 İşlem Özeti\n\n"
+            f"Göndereceğiniz: {coin_amount(state.get('amount_coin', 0))} {from_coin}\n"
+            f"Coin Fiyatı: {money(state.get('from_price', 0))} TL\n"
+            f"Toplam TL: {money(state.get('gross_tl', 0))} TL\n"
+            f"Komisyon: %{state.get('fee_percent', 0)}\n"
+            f"Size Ödenecek Net TL: {money(state.get('net_tl', 0))} TL"
+        )
+    else:
+        text = (
+            "📄 İşlem Özeti\n\n"
+            f"Göndereceğiniz: {coin_amount(state.get('amount_coin', 0))} {from_coin}\n"
+            f"Gönderilen TL Değeri: {money(state.get('gross_tl', 0))} TL\n"
+            f"Komisyon: %{state.get('fee_percent', 0)}\n"
+            f"Net TL: {money(state.get('net_tl', 0))} TL\n"
+            f"Alacağınız: {coin_amount(state.get('receive_amount', 0))} {state.get('to_coin', '')}"
+        )
+
+    send(chat_id, text)
+    send(chat_id, f"{from_coin} Gönderim Adresi:\n{address}")
+    send(chat_id, "Gönderimi yaptıktan sonra aşağıdaki butona basın.", payment_sent_keyboard())
+
+
 def order_type_name(order_type):
     return {
         "crypto_to_crypto": "🔄 Kripto → Kripto",
         "iban_to_crypto": "🏦 IBAN → Kripto",
         "crypto_to_iban": "💳 Kripto → IBAN",
     }.get(order_type, order_type or "Bilinmiyor")
-
-
-def parse_amount(value):
-    text = str(value or "").strip().replace(" ", "").replace(",", ".")
-    try:
-        amount = float(text)
-        if amount <= 0:
-            return None
-        return amount
-    except Exception:
-        return None
-
-
-def min_key_for_type(order_type):
-    return "min_" + str(order_type or "")
-
-
-def check_min_amount(order_type, amount_text):
-    amount = parse_amount(amount_text)
-    if amount is None:
-        return False, "❌ Lütfen geçerli bir miktar giriniz."
-
-    min_value = parse_amount(settings.get(min_key_for_type(order_type), "0"))
-    if min_value and amount < min_value:
-        msg = messages.get("min_amount_error", MESSAGE_DEFAULTS["min_amount_error"])
-        return False, msg.replace("{min_amount}", str(settings.get(min_key_for_type(order_type), min_value)))
-
-    return True, ""
-
-
-def bot_username():
-    cached = settings.get("bot_username", "").strip()
-    if cached:
-        return cached.lstrip("@")
-
-    result = api("getMe", {})
-    username = result.get("result", {}).get("username", "") if isinstance(result, dict) else ""
-    if username:
-        settings["bot_username"] = username
-        save_json("settings.json", settings)
-    return username
-
-
-def referral_code(chat_id):
-    return str(chat_id)
-
-
-def register_referral(new_chat_id, ref_code):
-    new_chat_id = str(new_chat_id)
-    ref_code = str(ref_code or "").replace("ref_", "").strip()
-
-    if not ref_code or ref_code == new_chat_id:
-        return False
-
-    with data_lock:
-        profile = referrals.setdefault(new_chat_id, {})
-        if profile.get("referrer_id"):
-            return False
-
-        profile["referrer_id"] = ref_code
-        profile["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        owner = referrals.setdefault(ref_code, {})
-        invited = owner.setdefault("invited", [])
-        if new_chat_id not in invited:
-            invited.append(new_chat_id)
-
-        save_json("referrals.json", referrals)
-
-    return True
-
-
-def referral_info(chat_id):
-    chat_id = str(chat_id)
-    code = referral_code(chat_id)
-    username = bot_username()
-    ref_link = f"https://t.me/{username}?start=ref_{code}" if username else f"/start ref_{code}"
-    count = len(referrals.get(chat_id, {}).get("invited", []))
-
-    text = messages.get("referral_text", MESSAGE_DEFAULTS["referral_text"])
-    text = text.replace("{ref_link}", ref_link).replace("{count}", str(count)).replace("{code}", code)
-    return messages.get("referral_title", MESSAGE_DEFAULTS["referral_title"]) + "\n\n" + text
 
 
 def create_order(chat_id, username):
@@ -325,52 +542,15 @@ def create_order(chat_id, username):
         orders[oid] = {
             "chat_id": chat_id,
             "username": username,
-            "referrer_id": referrals.get(str(chat_id), {}).get("referrer_id", ""),
             **s,
             "status": "⏳ Bekliyor",
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
+        orders[oid].pop("step", None)
         save_json("orders.json", orders)
 
-    type_name = order_type_name(s.get("type"))
-    fee = settings.get("fee_" + s.get("type", ""), "0")
-    min_amount = settings.get("min_" + s.get("type", ""), "0")
-
-    text = (
-        f"📄 Sipariş Özeti\n\n"
-        f"No: #{oid}\n"
-        f"Tür: {type_name}\n"
-        f"Komisyon: %{fee}\n"
-        f"Minimum İşlem: {min_amount} TL\n"
-    )
-
-    if s.get("type") == "crypto_to_crypto":
-        text += (
-            f"\nGönderilen: {s.get('amount', '')} {s.get('from_coin', '')}\n"
-            f"Alınacak: {s.get('to_coin', '')}\n"
-            f"Alıcı adres:\n{s.get('wallet', '')}\n"
-        )
-
-    elif s.get("type") == "iban_to_crypto":
-        text += (
-            f"\nÖdenecek TL: {s.get('amount', '')} TL\n"
-            f"Alınacak: {s.get('to_coin', '')}\n"
-            f"Alıcı adres:\n{s.get('wallet', '')}\n\n"
-            f"🏦 Ödeme IBAN:\n"
-            f"Banka: {settings.get('bank_name', '')}\n"
-            f"IBAN: {settings.get('iban', '')}\n"
-            f"Alıcı: {settings.get('iban_owner', '')}\n\n"
-            f"{messages.get('iban_warning', '')}\n"
-        )
-
-    elif s.get("type") == "crypto_to_iban":
-        text += (
-            f"\nGönderilen: {s.get('amount', '')} {s.get('from_coin', '')}\n"
-            f"IBAN:\n{s.get('iban', '')}\n"
-            f"Ad Soyad: {s.get('name', '')}\n"
-        )
-
-    text += "\nDurum: ⏳ Admin onayı bekleniyor"
+    text = order_detail_text(oid, orders[oid])
+    text += "\n\nDurum: ⏳ Admin onayı bekleniyor"
 
     created_prefix = messages.get("order_created", "✅ Siparişiniz oluşturuldu.")
     send(chat_id, f"{created_prefix}\n\n{text}")
@@ -391,15 +571,45 @@ def create_order(chat_id, username):
 
 
 def my_orders(chat_id):
-    found = [
-        f"#{oid} — {o.get('status', 'Bilinmiyor')}"
+    user_orders = [
+        (oid, o)
         for oid, o in orders.items()
         if str(o.get("chat_id")) == str(chat_id)
     ]
-    if found:
-        send(chat_id, messages.get("orders_title", MESSAGE_DEFAULTS["orders_title"]) + "\n\n" + "\n".join(found))
-    else:
+
+    user_orders = sorted(
+        user_orders,
+        key=lambda item: item[1].get("created_at", ""),
+        reverse=True,
+    )[:5]
+
+    if not user_orders:
         send(chat_id, messages.get("orders_empty", MESSAGE_DEFAULTS["orders_empty"]))
+        return
+
+    rows = [
+        [
+            telegram_button(
+                f"#{oid} — {o.get('status', 'Bilinmiyor')}",
+                f"order_detail_{oid}",
+            )
+        ]
+        for oid, o in user_orders
+    ]
+
+    rows.append([
+        telegram_button(
+            messages.get("button_main_menu", MESSAGE_DEFAULTS["button_main_menu"]),
+            "main",
+            "icon_main_menu",
+        )
+    ])
+
+    send(
+        chat_id,
+        messages.get("orders_title", MESSAGE_DEFAULTS["orders_title"]) + "\n\nSon 5 siparişiniz:",
+        {"inline_keyboard": rows},
+    )
 
 
 def update_order_status(oid, new_status, reject_reason="", approval_reason=""):
@@ -472,22 +682,15 @@ def bot_loop():
                     if custom_emoji_ids and str(chat_id) == str(ADMIN_CHAT_ID):
                         send(
                             chat_id,
-                            "🧩 Custom Emoji ID:\n\n" + "\n".join(custom_emoji_ids)
+                            "\n".join(custom_emoji_ids)
                         )
                         continue
 
-                    if text.startswith("/start"):
-                        parts = text.split(maxsplit=1)
-                        if len(parts) == 2 and parts[1].startswith("ref_"):
-                            if register_referral(chat_id, parts[1]):
-                                send(chat_id, messages.get("referral_registered", MESSAGE_DEFAULTS["referral_registered"]))
+                    if text == "/start":
                         menu(chat_id)
 
                     elif text == "/siparislerim":
                         my_orders(chat_id)
-
-                    elif text in ["/referans", "/ref"]:
-                        send(chat_id, referral_info(chat_id))
 
                     elif text.startswith("/tamamla") and str(chat_id) == str(ADMIN_CHAT_ID):
                         parts = text.split()
@@ -502,46 +705,71 @@ def bot_loop():
                         step = s.get("step")
 
                         if step == "amount":
-                            ok_min, min_error = check_min_amount(s.get("type"), text)
-                            if not ok_min:
-                                send(chat_id, min_error)
-                                continue
+                            try:
+                                if s["type"] == "iban_to_crypto":
+                                    ok, error, calc = calculate_iban_to_crypto(s, text)
+                                    if not ok:
+                                        send(chat_id, error)
+                                        continue
+                                    s.update(calc)
+                                    s["step"] = "await_payment_sent"
+                                    send_iban_payment_info(chat_id, s)
 
-                            s["amount"] = text
+                                elif s["type"] == "crypto_to_iban":
+                                    ok, error, calc = calculate_crypto_to_iban(s, text)
+                                    if not ok:
+                                        send(chat_id, error)
+                                        continue
+                                    s.update(calc)
+                                    s["step"] = "await_payment_sent"
+                                    send_crypto_payment_info(chat_id, s)
 
-                            if s["type"] in ["crypto_to_crypto", "iban_to_crypto"]:
-                                s["step"] = "wallet"
-                                send(
-                                    chat_id,
-                                    messages.get(
-                                        "wallet_question",
-                                        "📥 Alacağın coin için cüzdan adresini gir:"
-                                    ),
-                                )
-                            else:
-                                s["step"] = "iban"
-                                send(
-                                    chat_id,
-                                    messages.get(
-                                        "iban_question",
-                                        "🏦 IBAN adresini gir:"
-                                    ),
-                                )
+                                elif s["type"] == "crypto_to_crypto":
+                                    ok, error, calc = calculate_crypto_to_crypto(s, text)
+                                    if not ok:
+                                        send(chat_id, error)
+                                        continue
+                                    s.update(calc)
+                                    s["step"] = "await_payment_sent"
+                                    send_crypto_payment_info(chat_id, s)
+
+                            except Exception:
+                                send(chat_id, "❌ Lütfen geçerli bir miktar giriniz.")
+
+                        elif step == "payer_name":
+                            s["payer_name"] = text
+                            s["step"] = "wallet"
+                            send(
+                                chat_id,
+                                messages.get(
+                                    "wallet_question",
+                                    "📥 Alıcı cüzdan adresini giriniz:"
+                                ),
+                            )
 
                         elif step == "wallet":
                             s["wallet"] = text
                             create_order(chat_id, username)
 
-                        elif step == "iban":
-                            s["iban"] = text
-                            s["step"] = "name"
+                        elif step == "payout_name":
+                            s["name"] = text
+                            s["step"] = "payout_bank"
+                            send(chat_id, "🏦 Banka adını giriniz:")
+
+                        elif step == "payout_bank":
+                            s["bank_name_user"] = text
+                            s["step"] = "iban"
                             send(
                                 chat_id,
                                 messages.get(
-                                    "name_question",
-                                    "👤 IBAN sahibinin ad soyad bilgisini gir:"
+                                    "iban_question",
+                                    "🏦 IBAN adresinizi giriniz:"
                                 ),
                             )
+
+                        elif step == "iban":
+                            s["iban"] = text
+                            create_order(chat_id, username)
 
                         elif step == "name":
                             s["name"] = text
@@ -562,6 +790,38 @@ def bot_loop():
                     elif data == "orders":
                         my_orders(chat_id)
 
+                    elif data.startswith("order_detail_"):
+                        oid = data.replace("order_detail_", "")
+                        order = orders.get(oid)
+                        if order and str(order.get("chat_id")) == str(chat_id):
+                            send(chat_id, order_detail_text(oid, order))
+                        else:
+                            send(chat_id, "❌ Sipariş bulunamadı.")
+
+                    elif data == "payment_sent":
+                        s = user_state.get(chat_id)
+                        if not s:
+                            send(chat_id, messages.get("session_expired", MESSAGE_DEFAULTS["session_expired"]))
+                            continue
+
+                        if s.get("type") == "iban_to_crypto":
+                            s["step"] = "payer_name"
+                            send(chat_id, "👤 Gönderen kişi ad soyad bilgisini giriniz:")
+                        elif s.get("type") == "crypto_to_iban":
+                            s["step"] = "payout_name"
+                            send(chat_id, "👤 IBAN sahibinin ad soyad bilgisini giriniz:")
+                        elif s.get("type") == "crypto_to_crypto":
+                            s["step"] = "wallet"
+                            send(
+                                chat_id,
+                                messages.get(
+                                    "wallet_question",
+                                    "📥 Alıcı cüzdan adresini giriniz:"
+                                ),
+                            )
+                        else:
+                            send(chat_id, messages.get("session_expired", MESSAGE_DEFAULTS["session_expired"]))
+
                     elif data == "fees":
                         send(
                             chat_id,
@@ -576,15 +836,11 @@ def bot_loop():
                     elif data == "help":
                         send(
                             chat_id,
-                            messages.get("help", "ℹ️ İşlem türünü seçin.")
-                            + f"\n\nÇalışma saatleri: {messages.get('working_hours', '')}",
+                            messages.get("help", "ℹ️ İşlem türünü seçin."),
                         )
 
                     elif data == "support":
                         send(chat_id, messages.get("support", "📞 Destek"))
-
-                    elif data == "referral":
-                        send(chat_id, referral_info(chat_id))
 
                     elif data == "type_crypto_to_crypto":
                         user_state[chat_id] = {"type": "crypto_to_crypto"}
@@ -838,14 +1094,41 @@ def render_order_cards(view="active"):
             ("Sipariş No", f"#{oid}"),
             ("Kullanıcı", f"@{order.get('username', 'unknown')}"),
             ("Telegram ID", order.get("chat_id", "")),
-            ("Referans Veren", order.get("referrer_id", "-") or "-"),
             ("Tür", order_type_name(order.get("type"))),
-            ("Miktar", order.get("amount", "")),
-            ("Gönderilen Coin", order.get("from_coin", "-")),
-            ("Alınacak Coin", order.get("to_coin", "-")),
-            ("Cüzdan", order.get("wallet", "-")),
-            ("IBAN", order.get("iban", "-")),
-            ("Ad Soyad", order.get("name", "-")),
+        ]
+
+        if order.get("amount_tl") not in [None, ""]:
+            details.append(("Ödenen TL", f"{money(order.get('amount_tl'))} TL"))
+        if order.get("amount_coin") not in [None, ""]:
+            details.append(("Gönderilen Coin", f"{coin_amount(order.get('amount_coin'))} {order.get('from_coin', '')}"))
+        elif order.get("from_coin"):
+            details.append(("Gönderilen Coin", order.get("from_coin", "-")))
+        if order.get("gross_tl") not in [None, ""]:
+            details.append(("Toplam TL Değeri", f"{money(order.get('gross_tl'))} TL"))
+        if order.get("fee_percent") not in [None, ""]:
+            details.append(("Komisyon", f"%{order.get('fee_percent')}"))
+        if order.get("net_tl") not in [None, ""]:
+            details.append(("Net TL", f"{money(order.get('net_tl'))} TL"))
+        if order.get("receive_amount") not in [None, ""]:
+            details.append(("Alınacak Coin", f"{coin_amount(order.get('receive_amount'))} {order.get('to_coin', '')}"))
+        elif order.get("to_coin"):
+            details.append(("Alınacak Coin", order.get("to_coin", "-")))
+        if order.get("from_price") not in [None, ""]:
+            details.append((f"{order.get('from_coin', '')} Fiyatı", f"{money(order.get('from_price'))} TL"))
+        if order.get("to_price") not in [None, ""]:
+            details.append((f"{order.get('to_coin', '')} Fiyatı", f"{money(order.get('to_price'))} TL"))
+        if order.get("payer_name"):
+            details.append(("Gönderen Ad Soyad", order.get("payer_name")))
+        if order.get("wallet"):
+            details.append(("Cüzdan", order.get("wallet")))
+        if order.get("bank_name_user"):
+            details.append(("Banka", order.get("bank_name_user")))
+        if order.get("iban"):
+            details.append(("IBAN", order.get("iban")))
+        if order.get("name"):
+            details.append(("Ad Soyad", order.get("name")))
+
+        details += [
             ("Oluşturulma", order.get("created_at", "-")),
             ("Durum", status),
         ]
@@ -1059,7 +1342,6 @@ def admin():
         save_json("messages.json", messages)
         save_json("coins.json", coins)
         save_json("orders.json", orders)
-        save_json("referrals.json", referrals)
 
         return_view = request.form.get("return_view", "active")
 
@@ -1118,11 +1400,7 @@ def admin():
         ("help", "Nasıl çalışır mesajı"),
         ("support", "Destek mesajı"),
         ("iban_warning", "IBAN uyarı mesajı"),
-        ("working_hours", "Çalışma saatleri / durum metni"),
-        ("min_amount_error", "Minimum miktar hata mesajı"),
-        ("referral_title", "Referans başlığı"),
-        ("referral_text", "Referans mesajı"),
-        ("referral_registered", "Referans kayıt mesajı"),
+        ("working_hours", "Çalışma saatleri"),
     ]
 
     button_fields = [
@@ -1130,7 +1408,6 @@ def admin():
         ("button_my_orders", "Ana menü: Siparişlerim"),
         ("button_fees", "Ana menü: Komisyonlar"),
         ("button_help", "Ana menü: Nasıl Çalışır?"),
-        ("button_referral", "Ana menü: Referansım"),
         ("button_support", "Ana menü: Destek"),
         ("button_iban_to_crypto", "İşlem türü: IBAN → Kripto"),
         ("button_crypto_to_iban", "İşlem türü: Kripto → IBAN"),
@@ -1144,13 +1421,17 @@ def admin():
         ("icon_my_orders", "Siparişlerim custom emoji ID"),
         ("icon_fees", "Komisyonlar custom emoji ID"),
         ("icon_help", "Nasıl Çalışır custom emoji ID"),
-        ("icon_referral", "Referansım custom emoji ID"),
         ("icon_support", "Destek custom emoji ID"),
         ("icon_iban_to_crypto", "IBAN → Kripto custom emoji ID"),
         ("icon_crypto_to_iban", "Kripto → IBAN custom emoji ID"),
         ("icon_crypto_to_crypto", "Kripto → Kripto custom emoji ID"),
         ("icon_main_menu", "Ana Menü custom emoji ID"),
         ("icon_back", "Geri custom emoji ID"),
+        ("icon_pending", "Bekleyen custom emoji ID"),
+        ("icon_processing", "Processing custom emoji ID"),
+        ("icon_security", "Güvenlik custom emoji ID"),
+        ("icon_rejected", "Reddedildi custom emoji ID"),
+        ("icon_completed", "Tamamlandı custom emoji ID"),
     ]
 
     message_inputs = ""
@@ -1778,6 +2059,22 @@ def admin():
                     </details>
 
                     <details class="box">
+                        <summary>💱 Coin Fiyatları</summary>
+                        <div class="collapsible-content">
+
+                        <label>TRX TL fiyatı</label>
+                        <input name="price_TRX" value="{h(settings.get('price_TRX', '15.50'))}">
+
+                        <label>LTC TL fiyatı</label>
+                        <input name="price_LTC" value="{h(settings.get('price_LTC', '2065'))}">
+
+                        <label>USDT TL fiyatı</label>
+                        <input name="price_USDT" value="{h(settings.get('price_USDT', '46.40'))}">
+
+                        </div>
+                    </details>
+
+                    <details class="box">
                         <summary>🏦 IBAN Yönetimi</summary>
                         <div class="collapsible-content">
 
@@ -1801,21 +2098,6 @@ def admin():
                     💾 Tüm Mesaj, Buton ve Ayarları Kaydet
                 </button>
             </form>
-
-
-            <details class="box">
-                <summary>👥 Referans Sistemi</summary>
-                <div class="collapsible-content">
-                <div class="section-note">
-                    Kullanıcılar kendi referans linkini /referans komutu veya Referansım butonu ile alır.
-                    Linkle gelen kullanıcı ilk /start sırasında referans verene bağlanır. Sistem 7/24 sipariş almaya devam eder.
-                </div>
-                <div class="details">
-                    <div class="detail"><span>Toplam referans profili</span><strong>{len(referrals)}</strong></div>
-                    <div class="detail"><span>Toplam davet kaydı</span><strong>{sum(len(v.get('invited', [])) for v in referrals.values() if isinstance(v, dict))}</strong></div>
-                </div>
-                </div>
-            </details>
 
             <details class="box">
                 <summary>🪙 Coin Yönetimi</summary>
@@ -2090,4 +2372,3 @@ def admin():
 if __name__ == "__main__":
     threading.Thread(target=bot_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=PORT)
-
