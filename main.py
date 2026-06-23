@@ -52,14 +52,15 @@ SETTINGS_DEFAULTS = {
     "min_crypto_to_crypto": "0",
     "min_iban_to_crypto": "0",
     "min_crypto_to_iban": "0",
-    "bank_name": "",
-    "iban": "",
-    "iban_owner": "",
+    "bank_name": "Zaqel Test Bankası",
+    "iban": "TR3300062000000000066295784",
+    "iban_owner": "ZAQEL TEST HESABI",
     "iban_active": "on",
 }
 
 for key, default_value in SETTINGS_DEFAULTS.items():
-    settings.setdefault(key, default_value)
+    if not str(settings.get(key, "")).strip():
+        settings[key] = default_value
 
 save_json("settings.json", settings)
 
@@ -128,7 +129,63 @@ for key, default_value in ICON_DEFAULTS.items():
     if not str(messages.get(key, "")).strip():
         messages[key] = default_value
 
+BUTTON_ICON_PREFIXES = {
+    "button_start_swap": "🔄 ",
+    "button_my_orders": "📦 ",
+    "button_fees": "💰 ",
+    "button_help": "ℹ️ ",
+    "button_support": "📞 ",
+    "button_iban_to_crypto": "🏦 ",
+    "button_crypto_to_iban": "💳 ",
+    "button_crypto_to_crypto": "🔄 ",
+    "button_main_menu": "⬅️ ",
+    "button_back": "⬅️ ",
+}
+
+for key, prefix in BUTTON_ICON_PREFIXES.items():
+    value = str(messages.get(key, ""))
+    if value.startswith(prefix):
+        messages[key] = value[len(prefix):].strip()
+
 save_json("messages.json", messages)
+
+DEFAULT_COINS = {
+    "TRX": {
+        "name": "TRON",
+        "emoji": "",
+        "network": "TRC20",
+        "address": "TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE",
+        "logo": "",
+        "custom_emoji_id": "5895440778150288520",
+        "active": "on",
+    },
+    "USDT": {
+        "name": "Tether USD",
+        "emoji": "",
+        "network": "TRC20",
+        "address": "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj",
+        "logo": "",
+        "custom_emoji_id": "5895571353746021767",
+        "active": "on",
+    },
+    "LTC": {
+        "name": "Litecoin",
+        "emoji": "",
+        "network": "LTC",
+        "address": "ltc1q9fyk7f0k5k6f8v9e3h2s0a8p3q2z6r7t5y4x9s",
+        "logo": "",
+        "custom_emoji_id": "5895441495409828662",
+        "active": "on",
+    },
+}
+
+for symbol, default_coin in DEFAULT_COINS.items():
+    if symbol not in coins or not isinstance(coins.get(symbol), dict):
+        coins[symbol] = dict(default_coin)
+    else:
+        for key, default_value in default_coin.items():
+            if not str(coins[symbol].get(key, "")).strip():
+                coins[symbol][key] = default_value
 
 COIN_CUSTOM_EMOJI_DEFAULTS = {
     "TRX": "5895440778150288520",
